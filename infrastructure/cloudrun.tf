@@ -19,7 +19,7 @@ resource "google_cloud_run_v2_service" "zapzap_backend" {
     containers {
       image = "europe-west1-docker.pkg.dev/${var.gcp_project_id}/zapzap-repo/zapzap-backend:latest"
       ports {
-        name = "http1"
+        name           = "http1"
         container_port = 2121
       }
       env {
@@ -31,9 +31,13 @@ resource "google_cloud_run_v2_service" "zapzap_backend" {
       env {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = "zapzap"
+
+
       }
     }
   }
+  depends_on = [google_artifact_registry_repository.zapzap_repo]
+
 }
 
 

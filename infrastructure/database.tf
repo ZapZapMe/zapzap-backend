@@ -12,6 +12,7 @@ resource "google_sql_database_instance" "postgres_instance" {
   settings {
     tier = "db-f1-micro"
     deletion_protection_enabled = true
+    availability_type = "ZONAL"
   }
 }
 

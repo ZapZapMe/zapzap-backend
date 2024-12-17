@@ -14,6 +14,8 @@ resource "google_project_service" "enable_services" {
   service = each.key
 }
 
+
+
 # data "google_iam_policy" "admin" {
 #   binding {
 #     role = "roles/secretmanager.secretAccessor"
