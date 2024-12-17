@@ -3,5 +3,4 @@ uvicorn==0.15.0
 authlib
 sqlalchemy
 databases
-dotenv
 starlette
