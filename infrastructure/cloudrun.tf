@@ -27,6 +27,10 @@ resource "google_cloud_run_v2_service" "zapzap_backend" {
         value = google_sql_database_instance.postgres_instance.public_ip_address
       }
       env {
+        name  = "DB_NAME"
+        value = google_sql_database_instance.postgres_instance.name
+      }
+      env {
         name  = "DB_USER"
         value = google_sql_user.db_user.name
       }
