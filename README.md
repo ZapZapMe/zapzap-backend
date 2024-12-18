@@ -26,6 +26,8 @@ gcloud run deploy zapzap-backend --image europe-west1-docker.pkg.dev/zapzap01/za
 
 ## infrastrcture
 
+setup using terraform and viewable in the [console](https://console.cloud.google.com/home/dashboard)
+
 ```bash
 # project setup
 gcloud config set run/region europe-west1
@@ -45,4 +47,15 @@ gcloud projects add-iam-policy-binding zapzap01 --member="user:user@gmail.com"  
 
 # Domain verification
 gcloud domains verify zap-zap.me
+```
+
+## database
+
+```bash
+# install gcloud and authenticate
+# https://cloud.google.com/sql/docs/postgres/sql-proxy#install
+./cloud_sql_proxy -instances=zapzap01:europe-west1:postgres-instance=tcp:5432
+# username: db-user
+# database: zapzap
+# nossl
 ```

@@ -36,6 +36,10 @@ data "google_secret_manager_secret_version" "db_password" {
   version = "latest"
 }
 
+output "postgres_instance_ip" {
+  value = google_sql_database_instance.postgres_instance.public_ip_address
+}
+
 output "db_password" {
   value     = data.google_secret_manager_secret_version.db_password.secret_data
   sensitive = true
