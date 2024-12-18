@@ -23,16 +23,20 @@ resource "google_cloud_run_v2_service" "zapzap_backend" {
         container_port = 2121
       }
       env {
-        name  = "DB_CONNECTION_STRING"
-        value = "nothing"
-        #value = "postgresql://dbuser:${data.google_secret_manager_secret.db_password.secret_data}@/defaultdb?host=/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}"
+        name  = "DB_HOST"
+        value = google_sql_database_instance.postgres_instance.public_ip_address
       }
-
+      env {
+        name  = "DB_USER"
+        value = google_sql_user.db_user.name
+      }
+      env {
+        name  = "DB_PASSWORD"
+        value = data.google_secret_manager_secret_version.db_password.secret_data
+      }
       env {
         name  = "GOOGLE_CLOUD_PROJECT"
         value = "zapzap"
-
-
       }
     }
   }
