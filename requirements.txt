@@ -4,3 +4,4 @@ authlib
 sqlalchemy
 databases
 starlette
+python-dotenv
