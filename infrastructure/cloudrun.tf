@@ -18,28 +18,43 @@ resource "google_cloud_run_v2_service" "zapzap_backend" {
   template {
     containers {
       image = "europe-west1-docker.pkg.dev/${var.gcp_project_id}/zapzap-repo/zapzap-backend:latest"
+      volume_mounts {
+        name       = "cloudsql"
+        mount_path = "/cloudsql"
+      }
       ports {
         name           = "http1"
         container_port = 2121
       }
       env {
-        name  = "DB_CONNECTION_STRING"
-        value = "nothing"
-        #value = "postgresql://dbuser:${data.google_secret_manager_secret.db_password.secret_data}@/defaultdb?host=/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}"
+        name  = "DB_HOST"
+        value = google_sql_database_instance.postgres_instance.first_ip_address
       }
-
       env {
-        name  = "GOOGLE_CLOUD_PROJECT"
-        value = "zapzap"
-
-
+        name  = "DB_PORT"
+        value = 5432
+      }
+      env {
+        name  = "DB_USER"
+        value = google_sql_user.db_user.name
+      }
+      env {
+        name  = "DB_PASSWORD"
+        value = data.google_secret_manager_secret_version.db_password.secret_data
+      }
+      env {
+        name  = "DB_NAME"
+        value = google_sql_database.zapzap_database.name
+      }
+      env {
+        name  = "DB_URL"
+        value = "postgresql://${google_sql_user.db_user.name}:${data.google_secret_manager_secret_version.db_password.secret_data}@${google_sql_database_instance.postgres_instance.first_ip_address}:5432/${google_sql_database.zapzap_database.name}"
       }
     }
   }
   depends_on = [google_artifact_registry_repository.zapzap_repo]
 
 }
-
 
 resource "google_cloud_run_domain_mapping" "api-uri" {
   name     = var.backend_domain
@@ -63,6 +78,10 @@ resource "google_cloud_run_service_iam_member" "run_all_users" {
 output "cloud_run_service_url" {
   value = google_cloud_run_v2_service.zapzap_backend.uri
 }
+
+
+# output the database name of the zapzap database
+
 
 output "cloud_run_domain_mapping_url" {
   value = google_cloud_run_domain_mapping.api-uri.name
