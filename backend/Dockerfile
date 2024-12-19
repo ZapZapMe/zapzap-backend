@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code to the container
-COPY app/* .
+COPY app/ /app/
 
 # Expose the port on which the application will run (change as per your app's needs)
 EXPOSE 2121

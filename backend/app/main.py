@@ -1,7 +1,7 @@
 # from backend.app.models import user
 from fastapi import FastAPI
 from config import settings
-from .routes import users, auths
+from routes import users, auths
 from db import Base, engine
 
 Base.metadata.create_all(bind=engine)
