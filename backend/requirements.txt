@@ -1,5 +1,5 @@
 fastapi
-uvicorn==0.15.0
+uvicorn
 authlib
 sqlalchemy
 databases
@@ -7,3 +7,6 @@ starlette
 python-dotenv
 python-dotenv
 httpx
+psycopg2-binary
+pg8000
+python-jose

@@ -9,3 +9,4 @@ class User(Base):
     twitter_username = Column(String, unique=True, index=True, nullable=False)
     # add a timestamp when the user was created
     created_at = Column(DateTime, default=datetime.utcnow)
+    bolt12_address = Column(String, nullable=True, index=True)

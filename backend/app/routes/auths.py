@@ -1,30 +1,47 @@
+from contextvars import Token
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from db import get_db
-from config import Settings
+from config import settings
 from models.user import User
-from utils.twitter_oauth import get_authorization_url, get_twitter_user_info, exchange_code_for_token
+from datetime import timedelta
+from schemas.auth import Token
+from utils.twitter_oauth import (
+    get_authorization_url,
+    get_twitter_user_info,
+    exchange_code_for_token,
+)
+import logging
+from utils.security import create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
 
 @router.get("/twitter/login")
 def twitter_login():
     url = get_authorization_url()
+    logging.info("Redirecting user to Twitter for authentication")
     return {"authorization_url": url}
 
 
-@router.get("/twitter/callback")
+@router.get("/twitter/callback", response_model=Token)
 async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     code = request.query_params.get("code")
     state = request.query_params.get("state")
     if not code:
+        logging.info("Authentication failed: No code provided.")
         raise HTTPException(status_code=400, detail="Code not provided")
 
     # Exchange code for token (OAuth 2.0 flow)
-    token_response = await exchange_code_for_token(code)
-    print("Token response: ", token_response)
+    try:
+        token_response = await exchange_code_for_token(code)
+    except Exception as e:
+        logging.error(f"Token exchange failed: {e}")
+        raise HTTPException(status_code=400, detail="Failed to exchange code for token")
+
     access_token = token_response.get("access_token")
     if not access_token:
+        logging.error("No access token returned from the token exchange")
         raise HTTPException(status_code=400, detail="No access token returned")
 
     # Get user info
@@ -32,12 +49,26 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     twitter_id = user_info["data"]["id"]
     twitter_username = user_info["data"]["username"]
 
-    existing_user = db.query(User).filter(User.twitter_username == twitter_username).first()
+    existing_user = (
+        db.query(User).filter(User.twitter_username == twitter_username).first()
+    )
     if not existing_user:
         new_user = User(twitter_username=twitter_username)
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        return new_user
+        user = new_user
+    else:
+        user = existing_user
 
-    return existing_user
+    access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)
+    token = create_access_token(
+        data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_id": user.id,
+        "twitter_username": user.twitter_username
+    }
