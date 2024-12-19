@@ -1,0 +1,9 @@
+fastapi
+uvicorn==0.15.0
+authlib
+sqlalchemy
+databases
+starlette
+python-dotenv
+python-dotenv
+httpx
