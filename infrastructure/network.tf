@@ -1,25 +1,24 @@
-resource "google_compute_network" "peering_network" {
-  name                    = "private-network"
-  auto_create_subnetworks = "false"
+data "google_compute_network" "default_vpc" {
+  name    = "default"
 }
 
-resource "google_compute_global_address" "private_ip_address" {
-  name          = "private-ip-address"
+# create an vpc access connector
+resource "google_vpc_access_connector" "vpc_access_connector" {
+  provider = google-beta
+  min_instances = 2
+  max_instances = 10
+  name     = "vpc-access-connector"
+  network  = data.google_compute_network.default_vpc.name
+  region   = var.gcp_region
+  project = var.gcp_project_id
+  ip_cidr_range = var.vpc_access_connector_ip_cidr_range
+}
+
+
+resource "google_compute_global_address" "private_ip_allocation" {
+  name          = "friedaishot"
   purpose       = "VPC_PEERING"
   address_type  = "INTERNAL"
-  prefix_length = 16
-  network       = google_compute_network.peering_network.id
-}
-
-resource "google_service_networking_connection" "default" {
-  network                 = google_compute_network.peering_network.id
-  service                 = "servicenetworking.googleapis.com"
-  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
-}
-
-resource "google_compute_network_peering_routes_config" "peering_routes" {
-  peering              = google_service_networking_connection.default.peering
-  network              = google_compute_network.peering_network.name
-  import_custom_routes = true
-  export_custom_routes = true
+  prefix_length = 24
+  network       = data.google_compute_network.default_vpc.self_link
 }

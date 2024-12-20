@@ -2,9 +2,8 @@ resource "google_project_service" "sqladmin" {
   service = "sqladmin.googleapis.com"
 }
 
-# create a postgres database instance called postgres-instance
 resource "google_sql_database_instance" "postgres_instance" {
-  name                = "postgres-instance"
+  name                = "zapzap-pg-instance"
   database_version    = "POSTGRES_15"
   region              = var.gcp_region
   deletion_protection = false
@@ -12,7 +11,7 @@ resource "google_sql_database_instance" "postgres_instance" {
   settings {
     ip_configuration {
       ipv4_enabled    = "false"
-      private_network = google_compute_network.peering_network.id
+      private_network = data.google_compute_network.default_vpc.self_link
     }
     tier                        = "db-f1-micro"
     deletion_protection_enabled = true
@@ -23,15 +22,17 @@ resource "google_sql_database_instance" "postgres_instance" {
 
 # create a database called zapzap
 resource "google_sql_database" "zapzap_database" {
-  name     = "zapzap"
-  instance = google_sql_database_instance.postgres_instance.name
+  name       = "zapzap"
+  instance   = google_sql_database_instance.postgres_instance.name
+  depends_on = [google_sql_database_instance.postgres_instance]
 }
 
 
 resource "google_sql_user" "db_user" {
-  name     = "db-user"
-  instance = google_sql_database_instance.postgres_instance.name
-  password = data.google_secret_manager_secret_version.db_password.secret_data
+  name       = "db-user"
+  instance   = google_sql_database_instance.postgres_instance.name
+  password   = data.google_secret_manager_secret_version.db_password.secret_data
+  depends_on = [google_sql_database_instance.postgres_instance]
 }
 
 
@@ -47,6 +48,6 @@ output "db_password" {
   sensitive = true
 }
 
-output zapzap_database {
+output "zapzap_database" {
   value = google_sql_database.zapzap_database.name
 }

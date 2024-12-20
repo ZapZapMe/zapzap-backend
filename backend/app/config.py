@@ -33,5 +33,9 @@ class Settings:
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_ACCESS_TOKEN_EXPIRE_SECONDS = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_SECONDS", 3600))
 
+    BREEZ_API_KEY = os.getenv("BREEZ_API_KEY")
+    BREEZ_API_BASE_URL = os.getenv("BREEZ_API_BASE_URL")
+    # BREEZ_WEBHOOK_SECRET = os.getenv("BREEZ_WEBHOOK_SECRET") # secret for validating webhook
+
 
 settings = Settings()
