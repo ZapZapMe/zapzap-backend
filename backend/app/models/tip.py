@@ -4,27 +4,23 @@ from db import Base
 from datetime import datetime
 
 
-class Tips(Base):
+class Tip(Base):
     __tablename__ = "tips"
 
     id = Column(Integer, primary_key=True, index=True)
-    amount = Column(Integer, nullable=False)
-    message = Column(String, nullable=True)
-    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
-    tweet_id = Column(Integer, nullable=False)
-    paid_out = Column(Boolean, default=False)
+    tipper_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    recipient_twitter_username = Column(String, nullable=False, index=True)
+    tweet_url = Column(String, nullable=False)
 
-    receive_ln_invoice = Column(String, nullable=False, unique=True, index=True)
-    receive_payment_hash = Column(String, nullable=False, unique=True, index=True)
-    recieve_payment_status = Column(String, default="pending")
+    bolt11_invoice = Column(String, nullable=False, index=True)
+    ln_payment_hash = Column(String, nullable=True, index=True)
 
-    
-    send_payment_hash = Column(String, nullable=False, unique=True, index=True)
-    send_payment_status = Column(String, default="pending")
+    comment = Column(String, nullable=True)
+    amount_sats = Column(Integer, nullable=False)
 
+    paid = Column(Boolean, default=False)
 
-    sender = relationship("User", foreign_keys=[sender_id], back_populates="sent_tips")
-    receiver = relationship("User", foreign_keys=[receiver_id], back_populates="received_tips")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    tipper_user = relationship("User", backref="tips", lazy="joined")
 

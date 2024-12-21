@@ -12,7 +12,7 @@ class Settings:
 
     # postgres_database
     db_user = os.environ["DB_USER"]
-    db_pass = os.environ["DB_PASSWORD"]
+    db_pass = os.environ["DB_PASS"]
     db_name = os.environ["DB_NAME"]
     db_port = os.environ["DB_PORT"]
     db_host = os.environ["DB_HOST"]
@@ -34,8 +34,9 @@ class Settings:
     JWT_ACCESS_TOKEN_EXPIRE_SECONDS = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_SECONDS", 3600))
 
     BREEZ_API_KEY = os.getenv("BREEZ_API_KEY")
-    BREEZ_API_BASE_URL = os.getenv("BREEZ_API_BASE_URL")
-    # BREEZ_WEBHOOK_SECRET = os.getenv("BREEZ_WEBHOOK_SECRET") # secret for validating webhook
+    BREEZ_INVITE_CODE = os.getenv("BREEZ_INVITE_CODE", "")
+    BREEZ_WORKING_DIR = os.getenv("BREEZ_WORKING_DIR", "./breez_data")
+    BREEZ_MNEMONIC = os.getenv("BREEZ_MNEMONIC")
 
 
 settings = Settings()

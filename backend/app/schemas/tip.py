@@ -1,31 +1,28 @@
-from pydantic import BaseModel, Field, HTTPUrl, validator
+from pydantic import BaseModel, Field, HttpUrl, validator
 from typing import List, Optional
 from datetime import datetime
 
 
 class TipCreate(BaseModel):
-    amount: int = Field(...,gt=0, description="amount in sats")
-    message: Optional[str] = Field(None, example="Great tweet!")
-    receiver_username: str = Field(..., description="Optional comment for the tip.")
-    tweet_url: HTTPUrl = Field(..., example="https://x.com/notgrubles/status/1869893445625557486")
+    recipient_twitter_username: str
+    amount_sats: int
+    comment: Optional[str] = None
+    tweet_url: HttpUrl
 
-    # @validator("receiver_username")
-    # def validate_receiver_username(cls, v):
-    #     if not v or not isinstance(v, str):
-    #         raise ValueError("Receiver username must be a non-empty string!")
-    #     return v
 
-class TipSend(BaseModel):
+class TipOut(BaseModel):
     id: int
-    amount: int
-    message: Optional[str]
-    sender_username: str
-    timestamp: datetime
-    tweet_url: HTTPUrl
-    paid_out: bool
-    payment_status: str
-    sent_payment_status: Optional[str] = None
+    amount_sats: int
+    comment: Optional[str]
+    bolt11_invoice: str
+    recipient_twitter_username: str
+    created_at: datetime
+    tweet_url: str
+    paid: bool
+    ln_payment_hash: Optional[str] = None
 
     class Config:
         orm_mode = True
 
+class TipUpdate(BaseModel):
+    paid: bool
