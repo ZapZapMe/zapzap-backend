@@ -1,10 +1,9 @@
-from sqlalchemy import Column, Integer, DateTime
 from db import Base
-from datetime import datetime
+from sqlalchemy.orm import mapped_column, Mapped
 
 
 class SyncState(Base):
     __tablename__ = "sync_state"
 
-    id = Column(Integer, primary_key=True, index=True)
-    last_timestamp = Column(DateTime, nullable=False, default="2009-01-03 00:00:00")
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    last_timestamp: Mapped[int] = mapped_column(nullable=False, default="0")

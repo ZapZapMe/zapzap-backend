@@ -1,18 +1,16 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from db import Base
 from datetime import datetime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, mapped_column, Mapped
+from typing import List
+
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    twitter_username = Column(String, unique=True, index=True, nullable=False)
-    # add a timestamp when the user was created
-    created_at = Column(DateTime, default=datetime.utcnow)
-    bolt12_address = Column(String, nullable=True, index=True)
-    is_admin = Column(Boolean, default=False)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    twitter_username: Mapped[str] = mapped_column(index=True, unique=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    bolt12_address: Mapped[str] = mapped_column(nullable=True, index=True)
+    is_admin: Mapped[bool] = mapped_column(default=False)
 
-    # add a relationship to the Tip model
-    sent_tips = relationship("Tip", foreign_keys="Tip.sender_id", back_populates="sender")
-    received_tips = relationship("Tip", foreign_keys="Tip.receiver_id", back_populates="receiver")
+    sent_tips: Mapped[List["Tip"]] = relationship(back_populates="tipper_user")

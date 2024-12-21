@@ -1,22 +1,24 @@
-import logging, time
-import breez_sdk
-from breez_sdk_liquid import default_config, ConnectRequest, ReceivePaymentRequest,ListPaymentsRequest, PaymentState, LiquidNetwork
+from datetime import datetime
+import logging
+
 from config import settings
 import breez_sdk_liquid
 from db import SessionLocal
 from models.tip import Tip
-from sqlalchemy.orm import Session
+
+# from sqlalchemy.orm import Session
 
 
 # Optional: define a global variable for 'sdk_services'
 sdk_services = None
+
 
 def mark_invoice_as_paid_in_db(invoice_or_hash: str):
     with SessionLocal() as db:
         tip = db.query(Tip).filter(Tip.ln_payment_hash == invoice_or_hash).first()
         if not tip:
             tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
-        
+
         if tip and not tip.paid:
             tip.paid = True
             db.commit()
@@ -33,6 +35,7 @@ class SDKListener(breez_sdk_liquid.EventListener):
             if payment.status == PaymentStatus.Succeeded:
                 mark_invoice_as_paid_in_db(payment.payment_hash)
 
+
 def connect_breez(restore_only: bool = False):
     """
     Connects to the Breez node and sets up the Breez services globally.
@@ -46,28 +49,31 @@ def connect_breez(restore_only: bool = False):
     # In production, store your real mnemonic in a safe place (not in code).
     # For now, let's assume you have it in environment:
     # e.g. MNEMONIC="abandon abandon abandon ... rocket manual"
-    mnemonic = settings.BREEZ_MNEMONIC if hasattr(settings, 'BREEZ_MNEMONIC') else "donor vacuum copy narrow clown prosper another shift often robot torch below"
-
-    seed = breez_sdk.mnemonic_to_seed(mnemonic)
+    mnemonic = (
+        settings.BREEZ_MNEMONIC
+        if hasattr(settings, "BREEZ_MNEMONIC")
+        else "donor vacuum copy narrow clown prosper another shift often robot torch below"
+    )
 
     # Build the Breez config
-    config = default_config(
+    config = breez_sdk_liquid.default_config(
         breez_api_key=settings.BREEZ_API_KEY,
-        network=LiquidNetwork.MAINNET
+        network=breez_sdk_liquid.LiquidNetwork.MAINNET,
     )
     config.working_dir = settings.BREEZ_WORKING_DIR
 
     # Connect request, specifying restore_only if you already have a node
-    connect_request = ConnectRequest(config, seed)
+    connect_request = breez_sdk_liquid.ConnectRequest(config, mnemonic)
 
     # This actually connects to the node (hosted on Greenlight).
     # Once done, Breez will handle LN channels, etc.
     try:
-        sdk_services = breez_sdk_liquid.connect(connect_request, SDKListener())
+        sdk_services = breez_sdk_liquid.connect(connect_request)
         logging.info("Breez SDK connected successfully.")
     except Exception as e:
         logging.error(f"Error connecting to Breez: {e}")
         raise
+
 
 # try:
 #     connect_request = ConnectRequest(config, mnemonic)
@@ -91,8 +97,9 @@ def get_balance():
     onchain_balance = node_state.onchain_balance_msat
     return {
         "lightning_balance_msat": ln_balance,
-        "onchain_balance_msat": onchain_balance
+        "onchain_balance_msat": onchain_balance,
     }
+
 
 def create_invoice(amount_sats: int, description: str = "Tip invoice"):
     """
@@ -102,10 +109,11 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
 
     amount_msat = amount_sats * 1000
-    request = ReceivePaymentRequest(amount_msat, description)
+    request = breez_sdk_liquid.ReceivePaymentRequest(amount_msat, description)
     response = sdk_services.receive_payment(request)
     # response.ln_invoice is the BOLT11 invoice
     return (response.ln_invoice, response.payment_hash)
+
 
 # def pay_invoice(invoice: str, amount_sats: int = None):
 #     """
@@ -132,25 +140,28 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 #         logging.error(f"Failed to pay invoice: {e}")
 #         raise
 
-def pull_unpaid_invoices_since(last_timestamp: int):
+
+def pull_unpaid_invoices_since(last_timestamp: datetime):
     """
     Lists all payments (both sent and received).
     """
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
 
-    req = ListPaymentsRequest(
-        payment_type_filter=PaymentTypeFilter.Received,
-        from_timestamp=last_timestamp,
-        include_failures=False
+    req = breez_sdk_liquid.ListPaymentsRequest(
+        [breez_sdk_liquid.PaymentType.RECEIVE],
+        from_timestamp=1696880000,
+        to_timestamp=1696959200,
+        offset=0,
+        limit=50,
     )
-
     new_payments = sdk_services.list_payments(req)
     count_marked = 0
 
     for p in new_payments:
-        if p.status == PaymentStatus.Succeeded:
+        if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
             mark_invoice_as_paid_in_db(p.payment_hash)
             count_marked += 1
-    logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
-
+    logging.info(
+        f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!"
+    )

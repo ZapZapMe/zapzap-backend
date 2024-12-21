@@ -1,4 +1,6 @@
 # from backend.app.models import user
+from datetime import time
+import time
 from fastapi import FastAPI
 from config import settings
 from routes import users, auths, tips

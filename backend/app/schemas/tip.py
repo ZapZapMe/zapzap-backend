@@ -22,7 +22,7 @@ class TipOut(BaseModel):
     ln_payment_hash: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class TipUpdate(BaseModel):
     paid: bool
