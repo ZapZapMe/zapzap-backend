@@ -1,15 +1,11 @@
 import logging, time
 import breez_sdk
-from breez_sdk_liquid import default_config, ConnectRequest, ReceivePaymentRequest,ListPaymentsRequest, PaymentState
+from breez_sdk_liquid import default_config, ConnectRequest, ReceivePaymentRequest,ListPaymentsRequest, PaymentState, LiquidNetwork
 from config import settings
 import breez_sdk_liquid
 from db import SessionLocal
 from models.tip import Tip
 from sqlalchemy.orm import Session
-
-
-
-
 
 
 # Optional: define a global variable for 'sdk_services'
@@ -57,21 +53,30 @@ def connect_breez(restore_only: bool = False):
     # Build the Breez config
     config = default_config(
         breez_api_key=settings.BREEZ_API_KEY,
-        network="MAINNET"
+        network=LiquidNetwork.MAINNET
     )
     config.working_dir = settings.BREEZ_WORKING_DIR
 
     # Connect request, specifying restore_only if you already have a node
-    connect_request = ConnectRequest(config, seed, restore_only=restore_only)
+    connect_request = ConnectRequest(config, seed)
 
     # This actually connects to the node (hosted on Greenlight).
     # Once done, Breez will handle LN channels, etc.
     try:
-        sdk_services = breez_sdk.connect(connect_request, SDKListener())
+        sdk_services = breez_sdk_liquid.connect(connect_request, SDKListener())
         logging.info("Breez SDK connected successfully.")
     except Exception as e:
         logging.error(f"Error connecting to Breez: {e}")
         raise
+
+# try:
+#     connect_request = ConnectRequest(config, mnemonic)
+#     sdk = connect(connect_request)
+#     return sdk
+# except Exception as error:
+#     logging.error(error)
+#     raise
+
 
 def get_balance():
     """
