@@ -1,12 +1,13 @@
 # from backend.app.models import user
 from datetime import time
 import time
+import logging
 from fastapi import FastAPI
 from config import settings
 from routes import users, auths, tips
 from db import Base, engine, SessionLocal
-from services.lightning_service import connect_breez, pull_unpaid_invoices_since
-from utils.sync_state import get_last_sync_state, set_last_sync_timestamp
+from services.lightning_service import connect_breez, pull_unpaid_invoices_since, add_liquid_event_listener, get_balance, create_invoice
+from utils.sync_state import get_last_sync_state, set_last_sync_timestamp 
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="ZapZap Backend")
@@ -14,6 +15,10 @@ app = FastAPI(title="ZapZap Backend")
 @app.on_event("startup")
 def startup_event():
     connect_breez(restore_only=True)
+
+    listener_id = add_liquid_event_listener()
+    logging.info(f"[startup_event] Nodeless event listener added, ID: {listener_id}")
+    print(f"[startup_event] Nodeless event listener added, ID: {listener_id}")
 
     with SessionLocal() as db:
         last_ts = get_last_sync_state(db)
@@ -40,9 +45,10 @@ def config_check():
         "greet": settings.GREETING,
     }
 
-@app.get("lightning/test-invoice")
+@app.get("/lightning/test-invoice")
 def test_invoice():
-    invoice = create_invoice(100, "Test invoice")
+    amount = 1100
+    invoice, temp, temp1= create_invoice(amount, "Test invoice")
     return {"invoice": invoice}
 
 @app.get("/lightning/test-balance")

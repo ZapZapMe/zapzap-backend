@@ -11,7 +11,7 @@ class TipCreate(BaseModel):
 
 
 class TipOut(BaseModel):
-    id: int
+    temp_id: int
     amount_sats: int
     comment: Optional[str]
     bolt11_invoice: str
@@ -22,7 +22,7 @@ class TipOut(BaseModel):
     ln_payment_hash: Optional[str] = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 class TipUpdate(BaseModel):
     paid: bool

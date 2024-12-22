@@ -13,24 +13,25 @@ router = APIRouter(prefix="/tips", tags=["tips"])
 
 @router.post("/", response_model=TipOut)
 def create_tip(
+    anonymous_user_id: int,
     tip_data: TipCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    # current_user: User = Depends(get_current_user),
 ):
     try:
-        bolt11, payment_hash = create_invoice(
+        bolt11, payment_hash, tip_fee = create_invoice(
             tip_data.amount_sats,
-            f"Tip from {current_user.twitter_username} - {tip_data.comment}",
+            f"Tip from anonymous - {tip_data.comment}",
         )
 
         new_tip = Tip(
-            tipper_user_id=current_user.id if current_user else None,
+            tipper_user_id=anonymous_user_id,
             recipient_twitter_username=tip_data.recipient_twitter_username,
-            tweet_url=tip_data.tweet_url,
+            tweet_url=str(tip_data.tweet_url),
             bolt11_invoice=bolt11,
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,
-            amount_sats=tip_data.amount_sats,
+            amount_sats=tip_data.amount_sats - tip_fee,
             paid=False,
         )
 

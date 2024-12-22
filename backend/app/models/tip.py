@@ -1,14 +1,15 @@
 from sqlalchemy.orm import relationship
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, Column, Integer
 from db import Base
 from datetime import datetime
 from sqlalchemy.orm import relationship, mapped_column, Mapped
-
+from models.user import User
 
 class Tip(Base):
     __tablename__ = "tip"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    # id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    temp_id = Column(Integer, primary_key=True)
     tipper_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
     recipient_twitter_username: Mapped[str] = mapped_column(nullable=False, index=True)
     tweet_url: Mapped[str] = mapped_column(nullable=False)

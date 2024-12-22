@@ -3,8 +3,23 @@ import logging
 
 from config import settings
 import breez_sdk_liquid
+from breez_sdk_liquid import (
+    GetInfoResponse,
+    PrepareReceiveRequest,
+    PaymentMethod,
+    ReceivePaymentRequest,
+    ListPaymentsRequest,
+    PaymentType,
+    PaymentState,
+    BindingLiquidSdk,
+    ConnectRequest,
+    default_config,
+    LiquidNetwork,
+    SdkEvent)
 from db import SessionLocal
 from models.tip import Tip
+import lnurl
+
 
 # from sqlalchemy.orm import Session
 
@@ -22,18 +37,64 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
         if tip and not tip.paid:
             tip.paid = True
             db.commit()
-            logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
+            logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.temp_id} is now paid!")
         else:
             logging.info(f"[mark_invoice_as_paid_in_db] no match or already paid!")
 
 
-# A basic logger for Breez events
-class SDKListener(breez_sdk_liquid.EventListener):
-    def on_event(self, event):
-        if isinstance(event, Event.PaymentReceived):
-            payment = event.payment
-            if payment.status == PaymentStatus.Succeeded:
-                mark_invoice_as_paid_in_db(payment.payment_hash)
+class SdkListener(breez_sdk_liquid.EventListener):
+    def on_event(sdk_event: SdkEvent):
+        logging.debug("Received event ", sdk_event)
+        print("Received event ", sdk_event)
+
+def add_event_listener(sdk: BindingLiquidSdk, listener: SdkListener):
+    try:
+        listener_id = sdk.add_event_listener(listener)
+        logging.info(f"Listener successfully added with ID: {listener_id}")
+        return listener_id
+    except Exception as error:
+        logging.error(error)
+        raise
+        
+class MyNodelessListener(SdkListener):
+    def on_event(self, sdk_event: SdkEvent):
+        logging.info(f"[MyNodelessListener] Received event: {sdk_event}")
+        print(f"[MyNodelessListener] Received event: {sdk_event}")
+        if isinstance(sdk_event, breez_sdk_liquid.SdkEvent.PAYMENT_SUCCEEDED):
+            payment = sdk_event.details
+            if payment.destination:
+                payment_invoice = payment.destination
+                mark_invoice_as_paid_in_db(payment_invoice)
+                logging.info(f"[MyNodelessListener] Marked {payment_invoice} as paid in DB")
+                print(f"[MyNodelessListener] Marked {payment_invoice} as paid in DB")
+
+
+
+def add_liquid_event_listener():
+    global sdk_services
+    if not sdk_services:
+        raise RuntimeError("Nodeless SDK not connected yet. Call connect_breez() first.")
+
+    listener = MyNodelessListener()
+    listener_id = add_event_listener(sdk_services, listener)
+    logging.info(f"Event listener initialized with ID: {listener_id}")
+    return listener_id
+
+
+# def add_event_listener(sdk: BindingLiquidSdk, listener: SDKListener):
+#     try:
+#         listener_id = sdk.add_event_listener(listener)
+#         logging.info(f"Listener added with ID: {listener_id}")
+#         return listener_id
+
+#     except Exception as error:
+#         logging.error(error)
+#         raise
+
+#         if isinstance(event, Event.PaymentReceived):
+#             payment = event.payment
+#             if payment.status == PaymentStatus.Succeeded:
+#                 mark_invoice_as_paid_in_db(payment.payment_hash)
 
 
 def connect_breez(restore_only: bool = False):
@@ -69,6 +130,7 @@ def connect_breez(restore_only: bool = False):
     # Once done, Breez will handle LN channels, etc.
     try:
         sdk_services = breez_sdk_liquid.connect(connect_request)
+        print("Breez Connected Successfully")
         logging.info("Breez SDK connected successfully.")
     except Exception as e:
         logging.error(f"Error connecting to Breez: {e}")
@@ -85,20 +147,28 @@ def connect_breez(restore_only: bool = False):
 
 
 def get_balance():
-    """
-    Returns the node's lightning and on-chain balance (in millisats).
-    Will throw an error if connect_breez() hasn't been called yet.
-    """
-    if not sdk_services:
-        raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
+    try: 
+        info = sdk_services.get_info()
+        balance_sats = info.balance_sat
+        pending_sats = info.pending_send_sat
+        pending_receive_sats = info.pending_receive_sat
+    except Exception as error:
+        logging.error(error)
+        raise
 
-    node_state = sdk_services.node_info()
-    ln_balance = node_state.channels_balance_msat
-    onchain_balance = node_state.onchain_balance_msat
-    return {
-        "lightning_balance_msat": ln_balance,
-        "onchain_balance_msat": onchain_balance,
-    }
+
+
+
+    # if not sdk_services:
+    #     raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
+
+    # node_state = sdk_services.node_info()
+    # ln_balance = node_state.channels_balance_msat
+    # onchain_balance = node_state.onchain_balance_msat
+    # return {
+    #     "lightning_balance_msat": ln_balance,
+    #     "onchain_balance_msat": onchain_balance,
+    # }
 
 
 def create_invoice(amount_sats: int, description: str = "Tip invoice"):
@@ -108,37 +178,46 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
 
-    amount_msat = amount_sats * 1000
-    request = breez_sdk_liquid.ReceivePaymentRequest(amount_msat, description)
-    response = sdk_services.receive_payment(request)
+    prepare_req = PrepareReceiveRequest(
+        payment_method=PaymentMethod.LIGHTNING, payer_amount_sat=amount_sats
+    )
+
+
+    prepare_resp = sdk_services.prepare_receive_payment(prepare_req)
+    
+    invoice_fee = prepare_resp.fees_sat
+
+    logging.info(f"[create invoice] LN fees estimated: {invoice_fee} sats")
+
+    receive_req = ReceivePaymentRequest(
+        prepare_response=prepare_resp,
+        description="Tip from anonymous",
+        use_description_hash=False,
+    )
+
+    receive_res = sdk_services.receive_payment(receive_req)
+
+    bolt11_invoice = receive_res.destination
+
+    # amount_msat = amount_sats * 1000
+    # request = breez_sdk_liquid.ReceivePaymentRequest(amount_msat, description)
+    # response = sdk_services.receive_payment(request)
     # response.ln_invoice is the BOLT11 invoice
-    return (response.ln_invoice, response.payment_hash)
+    return (bolt11_invoice, None, invoice_fee)
 
 
-# def pay_invoice(invoice: str, amount_sats: int = None):
-#     """
-#     Pays a BOLT11 invoice. If the invoice doesn't specify an amount,
-#     you can pass 'amount_sats'.
-#     """
-#     if not sdk_services:
-#         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
+# try:
+#     # Set the invoice amount you wish the payer to send, which should be within the above limits
+#     prepare_request = PrepareReceiveRequest(PaymentMethod.LIGHTNING, 5_000)
+#     prepare_response = sdk.prepare_receive_payment(prepare_request)
 
-#     # If invoice already includes an amount, amount_msat can be omitted.
-#     amount_msat = amount_sats * 1000 if amount_sats else None
-#     req = SendPaymentRequest(
-#         bolt11=invoice,
-#         amount_msat=amount_msat,
-#         # The next two params are optional
-#         label="ZapZap Payment",
-#         use_trampoline=True
-#     )
-#     try:
-#         result = sdk_services.send_payment(req)
-#         # 'result' includes payment_hash, payment_preimage, etc.
-#         return result
-#     except Exception as e:
-#         logging.error(f"Failed to pay invoice: {e}")
-#         raise
+#     # If the fees are acceptable, continue to create the Receive Payment
+#     receive_fees_sat = prepare_response.fees_sat
+#     logging.debug("Fees: ", receive_fees_sat, " sats")
+#     return prepare_response
+# except Exception as error:
+#     logging.error(error)
+#     raise
 
 
 def pull_unpaid_invoices_since(last_timestamp: datetime):
@@ -150,8 +229,7 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
 
     req = breez_sdk_liquid.ListPaymentsRequest(
         [breez_sdk_liquid.PaymentType.RECEIVE],
-        from_timestamp=1696880000,
-        to_timestamp=1696959200,
+        from_timestamp=last_timestamp,
         offset=0,
         limit=50,
     )
@@ -160,8 +238,20 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
 
     for p in new_payments:
         if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
-            mark_invoice_as_paid_in_db(p.payment_hash)
+            print("Payment paid when application starts")
+            bolt11_of_this_payment = p.destination
+            mark_invoice_as_paid_in_db(bolt11_of_this_payment)
             count_marked += 1
     logging.info(
         f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!"
     )
+
+
+def extract_payment_hash(invoice: str) -> str:
+    decoded_invoice = lnurl.decode(invoice)
+    payment_hash = decoded_invoice.get("payment_hash", None)
+    
+    if payment_hash:
+        return payment_hash
+    else:
+        raise ValueError("Payment hash not found in the invoice")
