@@ -2,11 +2,32 @@ from models.user import User
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db import get_db
-from schemas.user import UserCreate, UserOut
+import logging
+from schemas.user import UserCreate, UserOut, UserUpdate
 from utils.security import get_current_user
+from services.lightning_service import forward_payment_to_receiver
 #from app.models.user import User
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+@router.put("/me", response_model=UserOut)
+def update_user_profile(current_user: User, user_update: UserUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found!")
+    
+    updated = False
+    if user_update.bolt12_address and user.bolt12_address != user_update.bolt12_address:
+        user.bolt12_address = user_update.bolt12_address
+        updated = True
+
+    db.commit()
+    db.refresh(user)
+
+    if updated:
+        logging.info(f"User @{user.twitter_username} updated their BOLT12 address. Initiating forwarding of pending tips.")
+        forward_payment_to_receiver(user.id, db)
+    return user
 
 @router.get("/", response_model=list[UserOut])
 def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -15,7 +36,7 @@ def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_c
     
 
 @router.post("/", response_model=UserOut)
-def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_user(current_user: User, user_data: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.twitter_username == user_data.twitter_username).first()
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
@@ -25,4 +46,3 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_us
     db.commit()
     db.refresh(new_user)
     return new_user
-

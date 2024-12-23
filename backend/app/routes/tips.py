@@ -19,6 +19,14 @@ def create_tip(
     # current_user: User = Depends(get_current_user),
 ):
     try:
+        receiver = db.query(User).filter(User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
+        if not receiver:
+            raise HTTPException(status_code=404, detail="Receiver user not found")
+        
+        if not receiver.bolt12_address:
+            logging.warning(f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
+            print(f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
+        
         bolt11, payment_hash, tip_fee = create_invoice(
             tip_data.amount_sats,
             f"Tip from anonymous - {tip_data.comment}",
@@ -33,6 +41,8 @@ def create_tip(
             comment=tip_data.comment,
             amount_sats=tip_data.amount_sats - tip_fee,
             paid=False,
+            paid_out=False,
+            created_at=datetime.utcnow(),
         )
 
         db.add(new_tip)

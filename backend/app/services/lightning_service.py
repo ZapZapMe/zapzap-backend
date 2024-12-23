@@ -1,6 +1,6 @@
 from datetime import datetime
 import logging
-
+from sqlalchemy.orm import Session
 from config import settings
 import breez_sdk_liquid
 from breez_sdk_liquid import (
@@ -14,11 +14,15 @@ from breez_sdk_liquid import (
     BindingLiquidSdk,
     ConnectRequest,
     default_config,
+    PrepareSendRequest,
+    SendPaymentRequest,
+    PayAmount,
     LiquidNetwork,
     SdkEvent)
 from db import SessionLocal
 from models.tip import Tip
 import lnurl
+from models.user import User
 
 
 # from sqlalchemy.orm import Session
@@ -26,6 +30,79 @@ import lnurl
 
 # Optional: define a global variable for 'sdk_services'
 sdk_services = None
+
+def forward_payment_to_receiver(tip_id: int):
+    with SessionLocal() as db:
+        tip = db.query(Tip).filter(Tip.id == tip_id).first()
+        if not tip:
+            logging.error(f"Tip ID {tip_id} not found.")
+            return None
+        if not tip.paid_in:
+            logging.error(f"Tip ID {tip_id} is not marked as paid.")
+            return None
+
+        receiver = db.query(User).filter(User.twitter_username == tip.receiver_username).first()
+        if not receiver or not receiver.bolt12_address:
+            logging.error(f"Receiver @{tip.receiver_username} not found in the database or does not have BOLT12 address.")
+            return None
+
+
+        amount_sats = tip.amount_sats
+        bolt12_offer = receiver.bolt12_address
+
+        try:
+            optional_amount = PayAmount.RECEIVER(amount_sats)
+            prepare_send_req = PrepareSendRequest(
+                destination=bolt12_offer,
+                amount=optional_amount
+            )
+            prepare_send_resp = sdk_services.prepare_send_payment(prepare_send_req)
+            logging.info(f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_send_resp.fees_sat} sats")
+
+            send_req = SendPaymentRequest(
+                prepare_response=prepare_send_resp
+            )
+            send_res = sdk_services.send_payment(send_req)
+            logging.info(f"Payment sent successfully. Payment Hash: {send_res.payment}")
+
+            return send_res.payment
+
+        except Exception as e:
+            logging.error(f"Error forwarding the payment for Tip ID {tip_id}: {e}")
+            return None
+
+
+def forward_pending_tips_for_user(user_id: int, db: Session):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.bolt12_address:
+        logging.error(f"User ID {user_id} does not exist or lacks a BOLT12 address")
+        return
+    pending_tips = db.query(Tip).filter(
+        Tip.recipient_twitter_username == user.twitter_username,
+        Tip.paid_in == True,
+        Tip.paid_out == False,
+    ).all()
+
+    if not pending_tips:
+        logging.info(f"No pending tips to forward to the user {user.twitter_username}")
+        return
+    
+    logging.info(f"Found {len(pending_tips)} pending tips for user {user.twitter_username}")
+
+    for tip in pending_tips:
+        try:
+            payment_hash = forward_pending_tips_for_user(user.bolt12_address, tip.amount_sats)
+            if payment_hash:
+                tip.forward_payment_hash = payment_hash
+                tip.paid_out = True
+                db.commit()
+                logging.info(f"Successfully forwarded {tip.amount_sats} sats for the Tip #{tip.id} to {user.bolt12_address}")
+            else:
+                logging.error(f"Failed to forward Tip #{tip.id} for user {user.twitter_username}")
+        
+        except Exception as e:
+            logging.error(f"Exception occured while forwarding tip #{tip.id}: {e}")
+
 
 
 def mark_invoice_as_paid_in_db(invoice_or_hash: str):
@@ -38,6 +115,18 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
             tip.paid = True
             db.commit()
             logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.temp_id} is now paid!")
+            
+            try:
+                payment_hash = forward_payment_to_receiver(tip.id)
+                if payment_hash:
+                    tip.forward_payment_hash = payment_hash
+                    tip.paid_out = True
+                    db.commit()
+                    logging.info("f[mark_invoice_as_paid_in_db] Forwarded {tip.amount_sats} sats to receiver @{tip.recipient_twitter_username}. Tip #{tip.temp_id} marked as paid out.")
+                else:
+                    logging.error(f"[mark_invoice_as_paid_in_db] Forwarding payment failed for Tip #{tip.id}")
+            except Exception as e:
+                logging.error(f"[mark_invoice_as_paid_in_db] Failed to forward payment for Tip #{tip.id}: {e}")           
         else:
             logging.info(f"[mark_invoice_as_paid_in_db] no match or already paid!")
 
@@ -60,7 +149,7 @@ class MyNodelessListener(SdkListener):
     def on_event(self, sdk_event: SdkEvent):
         logging.info(f"[MyNodelessListener] Received event: {sdk_event}")
         print(f"[MyNodelessListener] Received event: {sdk_event}")
-        if isinstance(sdk_event, breez_sdk_liquid.SdkEvent.PAYMENT_SUCCEEDED):
+        if isinstance(sdk_event, breez_sdk_liquid.SdkEvent.PAYMENT_PENDING):
             payment = sdk_event.details
             if payment.destination:
                 payment_invoice = payment.destination

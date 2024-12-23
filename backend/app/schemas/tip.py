@@ -18,11 +18,14 @@ class TipOut(BaseModel):
     recipient_twitter_username: str
     created_at: datetime
     tweet_url: str
-    paid: bool
+    paid_in: bool
+    paid_out: bool
     ln_payment_hash: Optional[str] = None
+    forwarded_payment_hash: Optional[str] = None
 
     class Config:
         orm_mode = True
 
 class TipUpdate(BaseModel):
-    paid: bool
+    paid_in: bool
+    paid_out: bool
