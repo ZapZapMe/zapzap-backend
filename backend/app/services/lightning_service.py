@@ -41,7 +41,7 @@ def forward_payment_to_receiver(tip_id: int):
             logging.error(f"Tip ID {tip_id} is not marked as paid.")
             return None
 
-        receiver = db.query(User).filter(User.twitter_username == tip.receiver_username).first()
+        receiver = db.query(User).filter(User.twitter_username == tip.recipient_twitter_username).first()
         if not receiver or not receiver.bolt12_address:
             logging.error(f"Receiver @{tip.receiver_username} not found in the database or does not have BOLT12 address.")
             return None
@@ -111,18 +111,19 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
         if not tip:
             tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
 
-        if tip and not tip.paid:
-            tip.paid = True
+        if tip and not tip.paid_in:
+            tip.paid_in = True
             db.commit()
-            logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.temp_id} is now paid!")
+            logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
             
             try:
                 payment_hash = forward_payment_to_receiver(tip.id)
+                print(payment_hash)
                 if payment_hash:
                     tip.forward_payment_hash = payment_hash
                     tip.paid_out = True
                     db.commit()
-                    logging.info("f[mark_invoice_as_paid_in_db] Forwarded {tip.amount_sats} sats to receiver @{tip.recipient_twitter_username}. Tip #{tip.temp_id} marked as paid out.")
+                    logging.info(f"[mark_invoice_as_paid_in_db] Forwarded {tip.amount_sats} sats to receiver @{tip.recipient_twitter_username}. Tip #{tip.id} marked as paid out.")
                 else:
                     logging.error(f"[mark_invoice_as_paid_in_db] Forwarding payment failed for Tip #{tip.id}")
             except Exception as e:

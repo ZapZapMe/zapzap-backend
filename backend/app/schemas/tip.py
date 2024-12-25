@@ -11,7 +11,7 @@ class TipCreate(BaseModel):
 
 
 class TipOut(BaseModel):
-    temp_id: int
+    id: int
     amount_sats: int
     comment: Optional[str]
     bolt11_invoice: str

@@ -1,8 +1,10 @@
 authlib
 breez_sdk_liquid
+cloud-sql-python-connector[pg8000]
 databases
 fastapi
 httpx
+lnurl
 pg8000
 psycopg2-binary
 pydantic

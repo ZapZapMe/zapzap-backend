@@ -6,13 +6,13 @@ import logging
 from schemas.user import UserCreate, UserOut, UserUpdate
 from utils.security import get_current_user
 from services.lightning_service import forward_payment_to_receiver
-#from app.models.user import User
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 @router.put("/me", response_model=UserOut)
-def update_user_profile(current_user: User, user_update: UserUpdate, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == current_user.id).first()
+def update_user_profile( current_user: str, user_update: UserUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.twitter_username == current_user).first()
+    print("User:", user)
     if not user:
         raise HTTPException(status_code=404, detail="User not found!")
     
@@ -26,7 +26,7 @@ def update_user_profile(current_user: User, user_update: UserUpdate, db: Session
 
     if updated:
         logging.info(f"User @{user.twitter_username} updated their BOLT12 address. Initiating forwarding of pending tips.")
-        forward_payment_to_receiver(user.id, db)
+        forward_payment_to_receiver(user.id)
     return user
 
 @router.get("/", response_model=list[UserOut])
@@ -36,7 +36,7 @@ def list_users(db: Session = Depends(get_db), current_user: User = Depends(get_c
     
 
 @router.post("/", response_model=UserOut)
-def create_user(current_user: User, user_data: UserCreate, db: Session = Depends(get_db)):
+def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     existing_user = db.query(User).filter(User.twitter_username == user_data.twitter_username).first()
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
@@ -46,3 +46,4 @@ def create_user(current_user: User, user_data: UserCreate, db: Session = Depends
     db.commit()
     db.refresh(new_user)
     return new_user
+

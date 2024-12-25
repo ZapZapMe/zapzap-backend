@@ -7,7 +7,7 @@ from utils.security import get_current_user
 from services.lightning_service import create_invoice, get_balance
 from models.user import User
 import logging
-
+from datetime import datetime
 router = APIRouter(prefix="/tips", tags=["tips"])
 
 
@@ -33,14 +33,13 @@ def create_tip(
         )
 
         new_tip = Tip(
-            tipper_user_id=anonymous_user_id,
             recipient_twitter_username=tip_data.recipient_twitter_username,
             tweet_url=str(tip_data.tweet_url),
             bolt11_invoice=bolt11,
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,
             amount_sats=tip_data.amount_sats - tip_fee,
-            paid=False,
+            paid_in=False,
             paid_out=False,
             created_at=datetime.utcnow(),
         )

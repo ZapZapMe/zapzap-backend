@@ -32,7 +32,7 @@ def decode_jwt_token(token: str) -> TokenData:
     )
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        user_twitter_username: str = payload.get("sub")
+        user_twitter_username: int = payload.get("sub")
         if user_twitter_username is None:
             raise credentials_exception
         token_data = TokenData()
