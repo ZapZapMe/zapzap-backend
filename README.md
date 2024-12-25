@@ -7,8 +7,12 @@ pip install --no-cache-dir -r requirements.txt
 source .env
 uvicorn main:app --reload --host 0.0.0.0 --port 2121
 ```
+You will need to setup a local proxy to the production database:
+```bash
+./cloud_sql_proxy -instances=zapzap-me:europe-west1:postgres-instance=tcp:127.0.0.1:5432
+```
 
-# Running Locally (Docker)
+## Running Locally (Docker)
 
 ```bash
 docker build -t zapzap-backend -f Dockerfile
