@@ -7,7 +7,7 @@ pip install --no-cache-dir -r requirements.txt
 source .env
 uvicorn main:app --reload --host 0.0.0.0 --port 2121
 ```
-You will need to setup a local proxy to the production database:
+You will need to setup a local proxy to the production database. Install https://github.com/GoogleCloudPlatform/cloud-sql-proxy and run: 
 ```bash
 ./cloud_sql_proxy -instances=zapzap-me:europe-west1:postgres-instance=tcp:127.0.0.1:5432
 ```
