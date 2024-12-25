@@ -55,7 +55,7 @@ def create_tip(
         raise HTTPException(status_code=400, detail="Failed to craete tip.")
 
 
-@router.get("/", response_model=TipOut)
+@router.get("/", response_model=list[TipOut])
 def list_tips(db: Session = Depends(get_db)):
     return db.query(Tip).all()
 
