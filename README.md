@@ -20,36 +20,6 @@ docer run zapzap-backend
 ```bash
 gcloud auth configure-docker europe-west1-docker.pkg.dev
 docker build -t zapzap-backend -f Dockerfile --platform linux/x86_64 .
-docker push     zapzap-backend europe-west1-docker.pkg.dev/zapzap01/zapzap-repo/zapzap-backend
-gcloud run deploy zapzap-backend --image europe-west1-docker.pkg.dev/zapzap01/zapzap-repo/zapzap-backend
-```
-
-
-## Infrastructure
-
-```bash
-# project setup
-gcloud config set run/region europe-west1
-gcloud projects create zapzap01 --name="zapzap"
-gcloud config set project zapzap01
-# setup billing account at https://console.cloud.google.com/billing/projects
-
-# database password
-gcloud services enable secretmanager.googleapis.com
-gcloud secrets create db_password --replication-policy="automatic"
-echo -n "xxx" | gcloud secrets versions add db_password --data-file=-
-gcloud secrets versions access latest --secret="db_password"
-
-# twitter secrets
-gcloud secrets create twitter_client_id     --replication-policy="automatic"
-gcloud secrets create twitter_client_secret --replication-policy="automatic"
-echo -n "xxx" | gcloud secrets versions add twitter_client_id     --data-file=-
-echo -n "xxx" | gcloud secrets versions add twitter_client_secret --data-file=-
-
-# permissions
-gcloud projects add-iam-policy-binding zapzap01 --member="user:simon@imaginator.com" --role="roles/owner"  # admin role
-gcloud projects add-iam-policy-binding zapzap01 --member="user:zainalishah51472@gmail.com"       --role="roles/editor" # developer role
-
-# Domain verification
-gcloud domains verify zap-zap.me
+docker push     zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
+gcloud run deploy cloudrun-service  --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
 ```
