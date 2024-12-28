@@ -24,6 +24,11 @@ docer run zapzap-backend
 ```bash
 gcloud auth configure-docker europe-west1-docker.pkg.dev
 docker build -t zapzap-backend -f Dockerfile --platform linux/x86_64 .
-docker push     zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
+
+docker tag zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:latest
+docker push europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:latest
+
+
+docker push zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
 gcloud run deploy cloudrun-service  --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
 ```

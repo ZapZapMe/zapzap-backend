@@ -21,7 +21,7 @@ class TipOut(BaseModel):
     paid_in: bool
     paid_out: bool
     ln_payment_hash: Optional[str] = None
-    forwarded_payment_hash: Optional[str] = None
+    forward_payment_hash: Optional[str] = None
 
     class Config:
         orm_mode = True

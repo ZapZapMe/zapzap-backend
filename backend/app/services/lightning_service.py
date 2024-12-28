@@ -91,7 +91,7 @@ def forward_pending_tips_for_user(user_id: int, db: Session):
 
     for tip in pending_tips:
         try:
-            payment_hash = forward_pending_tips_for_user(user.bolt12_address, tip.amount_sats)
+            payment_hash = forward_payment_to_receiver(tip.id)
             if payment_hash:
                 tip.forward_payment_hash = payment_hash
                 tip.paid_out = True

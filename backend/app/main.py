@@ -8,9 +8,25 @@ from routes import users, auths, tips
 from db import Base, engine, SessionLocal
 from services.lightning_service import connect_breez, pull_unpaid_invoices_since, add_liquid_event_listener, get_balance, create_invoice
 from utils.sync_state import get_last_sync_state, set_last_sync_timestamp 
+from fastapi.middleware.cors import CORSMiddleware
+
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="ZapZap Backend")
+
+origins = [
+    "https://zap-zap.me",
+    "https://www.zap-zap.me",
+    "http://localhost:5000",  # Added for local development
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allow these origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def startup_event():
