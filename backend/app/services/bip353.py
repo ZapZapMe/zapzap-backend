@@ -1,5 +1,27 @@
 import dns.resolver
 import re
+import urllib.parse
+
+def parse_bip21(uri):
+    # Parse the BIP21 URI
+    parsed = urllib.parse.urlparse(uri)
+    
+    # Ensure it's a Bitcoin URI
+    if parsed.scheme != "bitcoin":
+        raise ValueError("Invalid BIP21 URI: Missing 'bitcoin' scheme")
+    
+    # Extract the address and query components
+    address = parsed.path
+    query_params = urllib.parse.parse_qs(parsed.query)
+    
+    # Check if 'lno' exists
+    lno = query_params.get("lno", [None])[0]
+    
+    return {
+        "address": address,
+        "lno": lno,
+        "query_params": query_params
+    }
 
 def resolve_user_domain_to_bolt12(user_domain):
     """
@@ -21,7 +43,11 @@ def resolve_user_domain_to_bolt12(user_domain):
         answers = dns.resolver.resolve(txt_query, 'TXT')
 
         # Join all TXT record strings together
-        lno_address = ''.join([''.join(r.decode('utf-8') for r in record.strings) for record in answers]).replace("bitcoin:?lno=", "", 1)  # Return the complete joined lno1 address
+        bip21_uri = ''.join([''.join(r.decode('utf-8') for r in record.strings) for record in answers])
+
+        parsed_bip21 = parse_bip21(bip21_uri)
+        lno_address = parsed_bip21.get("lno")
+
         if lno_address:
             return lno_address
         else:
