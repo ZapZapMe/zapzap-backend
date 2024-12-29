@@ -10,9 +10,8 @@ from services.lightning_service import forward_payment_to_receiver
 router = APIRouter(prefix="/users", tags=["users"])
 
 @router.put("/me", response_model=UserOut)
-def update_user_profile( current_user: str, user_update: UserUpdate, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.twitter_username == current_user).first()
-    print("User:", user)
+def update_user_profile(user_update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user = db.query(User).filter(User.id == current_user.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found!")
     

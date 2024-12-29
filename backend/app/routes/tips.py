@@ -13,7 +13,6 @@ router = APIRouter(prefix="/tips", tags=["tips"])
 
 @router.post("/", response_model=TipOut)
 def create_tip(
-    anonymous_user_id: int,
     tip_data: TipCreate,
     db: Session = Depends(get_db),
     # current_user: User = Depends(get_current_user),
@@ -33,6 +32,7 @@ def create_tip(
         )
 
         new_tip = Tip(
+            tipper_display_name=tip_data.tipper_display_name or "anonymous",
             recipient_twitter_username=tip_data.recipient_twitter_username,
             tweet_url=str(tip_data.tweet_url),
             bolt11_invoice=bolt11,

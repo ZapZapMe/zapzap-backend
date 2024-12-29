@@ -8,6 +8,7 @@ class TipCreate(BaseModel):
     amount_sats: int
     comment: Optional[str] = None
     tweet_url: HttpUrl
+    tipper_display_name: Optional[str] = "anonymous"
 
 
 class TipOut(BaseModel):
