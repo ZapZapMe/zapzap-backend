@@ -10,6 +10,7 @@ class Tip(Base):
     __tablename__ = "tip"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    tipper_display_name: Mapped[str] = mapped_column(nullable=False, default="anonymous")
     tipper_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
     recipient_twitter_username: Mapped[str] = mapped_column(nullable=False, index=True)
     tweet_url: Mapped[str] = mapped_column(nullable=False)

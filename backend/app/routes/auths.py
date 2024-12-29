@@ -1,6 +1,7 @@
 from contextvars import Token
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from fastapi.responses import RedirectResponse
 from db import get_db
 from config import settings
 from models.user import User
@@ -27,7 +28,7 @@ def twitter_login():
 @router.get("/twitter/callback", response_model=Token)
 async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     code = request.query_params.get("code")
-    state = request.query_params.get("state")
+    # state = request.query_params.get("state")
     if not code:
         logging.info("Authentication failed: No code provided.")
         raise HTTPException(status_code=400, detail="Code not provided")
@@ -46,7 +47,7 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
 
     # Get user info
     user_info = await get_twitter_user_info(access_token)
-    twitter_id = user_info["data"]["id"]
+    # twitter_id = user_info["data"]["id"]
     twitter_username = user_info["data"]["username"]
 
     existing_user = (
@@ -65,10 +66,16 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     token = create_access_token(
         data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires
     )
+    frontend_url = "https://zap-zap.me/"
+    # or for local dev:
+    # frontend_url = "http://localhost:3000"
 
-    return {
-        "access_token": token,
-        "token_type": "bearer",
-        "user_id": user.id,
-        "twitter_username": user.twitter_username
-    }
+    redirect_url = f"{frontend_url}?token={token}"
+    return RedirectResponse(url=redirect_url)
+
+    # return {
+    #     "access_token": token,
+    #     "token_type": "bearer",
+    #     "user_id": user.id,
+    #     "twitter_username": user.twitter_username
+    # }

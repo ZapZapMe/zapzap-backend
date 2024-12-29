@@ -43,7 +43,7 @@ def forward_payment_to_receiver(tip_id: int):
 
         receiver = db.query(User).filter(User.twitter_username == tip.recipient_twitter_username).first()
         if not receiver or not receiver.bolt12_address:
-            logging.error(f"Receiver @{tip.receiver_username} not found in the database or does not have BOLT12 address.")
+            logging.error(f"Receiver @{tip.recipient_twitter_username} not found or does not have BOLT12 address.")
             return None
 
 
