@@ -281,7 +281,7 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 
     receive_req = ReceivePaymentRequest(
         prepare_response=prepare_resp,
-        description="Tip from anonymous",
+        description = f"ZapZap for {Tip.tweet_url}",
         use_description_hash=False,
     )
 
