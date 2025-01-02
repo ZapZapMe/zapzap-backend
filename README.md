@@ -16,7 +16,7 @@ You will need to setup a local proxy to the production database. Install https:/
 
 ```bash
 docker build -t zapzap-backend -f Dockerfile
-docer run zapzap-backend
+docker run zapzap-backend
 ```
 
 ## Pushing Builds

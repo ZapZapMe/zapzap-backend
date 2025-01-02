@@ -9,6 +9,10 @@ from services.lightning_service import forward_payment_to_receiver
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+@router.get("/me", response_model=UserOut)
+def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
 @router.put("/me", response_model=UserOut)
 def update_user_profile(user_update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     user = db.query(User).filter(User.id == current_user.id).first()

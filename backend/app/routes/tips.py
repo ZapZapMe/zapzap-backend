@@ -19,8 +19,18 @@ def create_tip(
 ):
     try:
         receiver = db.query(User).filter(User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
+        if receiver and not receiver.has_account:
+            logging.warning(f"Receiver @{receiver.twitter_username} exists but has not completed account setup.")
+
         if not receiver:
-            raise HTTPException(status_code=404, detail="Receiver user not found")
+            receiver = User(
+                twitter_username=tip_data.recipient_twitter_username.lstrip("@"),
+                has_account=False
+            )
+            db.add(receiver)
+            db.commit()
+            db.refresh(receiver)
+            logging.info(f"Created placeholder user for @{receiver.twitter_username}")
         
         if not receiver.bolt12_address:
             logging.warning(f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
@@ -34,7 +44,7 @@ def create_tip(
         new_tip = Tip(
             tipper_display_name=tip_data.tipper_display_name or "anonymous",
             recipient_twitter_username=tip_data.recipient_twitter_username,
-            tweet_url=str(tip_data.tweet_url),
+            tweet_url=tip_data.tweet_url,
             bolt11_invoice=bolt11,
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,
@@ -50,9 +60,15 @@ def create_tip(
 
         return new_tip
 
+    except HTTPException as http_exc:
+        logging.error(f"HTTP error occurred: {http_exc.detail}")
+        print(f"HTTP error occurred: {http_exc.detail}")
+        raise
     except Exception as e:
-        logging.error(f"Error creating tip: {e}")
-        raise HTTPException(status_code=400, detail="Failed to craete tip.")
+        print(f"Unexpected error occurred: {e}")
+        logging.error(f"Unexpected error occurred: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to create tip. Reason: {str(e)}")
+
 
 
 @router.get("/", response_model=list[TipOut])

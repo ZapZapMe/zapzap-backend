@@ -50,23 +50,25 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     # twitter_id = user_info["data"]["id"]
     twitter_username = user_info["data"]["username"]
 
-    existing_user = (
-        db.query(User).filter(User.twitter_username == twitter_username).first()
-    )
-    if not existing_user:
-        new_user = User(twitter_username=twitter_username)
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-        user = new_user
+    user = db.query(User).filter(User.twitter_username == twitter_username).first()
+
+
+    if not user:
+        user = User(twitter_username=twitter_username, has_account=True)
+        db.add(user)
+        user.has_account = True  # Update the user's account status
     else:
-        user = existing_user
+        user.has_account = True  # Update the user's account status
+
+    db.commit()
+    db.refresh(user)  # Refresh the user object to reflect committed changes
+
 
     access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)
     token = create_access_token(
         data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires
     )
-    frontend_url = "https://zap-zap.me/"
+    frontend_url = "http://localhost:5000/"
     # or for local dev:
     # frontend_url = "http://localhost:3000"
 
