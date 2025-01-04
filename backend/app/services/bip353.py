@@ -1,49 +1,33 @@
 import dns.resolver
 import re
 import urllib.parse
+import requests
 
-def parse_bip21(uri):
-    # Parse the BIP21 URI
-    parsed = urllib.parse.urlparse(uri)
-    
-    # Ensure it's a Bitcoin URI
-    if parsed.scheme != "bitcoin":
-        raise ValueError("Invalid BIP21 URI: Missing 'bitcoin' scheme")
-    
-    # Extract the address and query components
-    address = parsed.path
-    query_params = urllib.parse.parse_qs(parsed.query)
-    
-    # Check if 'lno' exists
-    lno = query_params.get("lno", [None])[0]
-    
-    return {
-        "address": address,
-        "lno": lno,
-        "query_params": query_params
-    }
+# we store the payout address as user@domain in the database
+# when it comes time to do a payment(user@domain):
+#   if
+#       recipient resolves via bip353 # bolt12
+#           do a sdk.prepare_send_payment
+#   else:
+#       resolve_recipient_via_lud16 # lnurl
+#           do a sdk.lnurl_pay
 
-def resolve_user_domain_to_bolt12(user_domain):
-    """
-    Resolves a user@domain format to a BOLT-12 lno1 format using DNS.
 
-    test with simon@imaginator.com or a phoenix wallet "human readable address"
-
-    :param user_domain: Input in the user@domain format.
-    :return: BOLT-12 lno1 address as a string or None if resolution fails.
-    """
+def resolve_recipient_via_bip353(user_domain):
     try:
         # Extract the user and domain
         user, domain = user_domain.split("@")
-        
+
         # Formulate the DNS label for TXT record lookup
         txt_query = f"{user}.user._bitcoin-payment.{domain}"
 
         # Perform the DNS TXT record query
-        answers = dns.resolver.resolve(txt_query, 'TXT')
+        answers = dns.resolver.resolve(txt_query, "TXT")
 
         # Join all TXT record strings together
-        bip21_uri = ''.join([''.join(r.decode('utf-8') for r in record.strings) for record in answers])
+        bip21_uri = "".join(
+            ["".join(r.decode("utf-8") for r in record.strings) for record in answers]
+        )
 
         parsed_bip21 = parse_bip21(bip21_uri)
         lno_address = parsed_bip21.get("lno")
@@ -63,48 +47,77 @@ def resolve_user_domain_to_bolt12(user_domain):
 
     return None
 
-def is_bolt12_address(address):
-    """
-    Checks if a given string is in the BOLT-12 lno1 format.
 
-    :param address: The string to check.
-    :return: True if it is in the BOLT-12 lno1 format, False otherwise.
-    """
-    return address.lower().startswith("lno1")
+def resolve_recipient_via_lud16(user_domain):
+    try:
+        # Split the identifier into username and domain
+        if "@" not in user_domain:
+            return False
 
-def is_user_domain_format(input_str):
-    """
-    Checks if a given string is in the user@domain format.
+        username, domain = user_domain.split("@", 1)
 
-    :param input_str: The string to check.
-    :return: True if it is in the user@domain format, False otherwise.
-    """
-    return re.match(r"^[^@]+@[a-zA-Z0-9.-]+$", input_str) is not None
+        # Construct the LUD-16 lookup URL
+        url = f"https://{domain}/.well-known/lnurlp/{username}"
+        print(f"{url}")
+        # Perform the HTTP GET request
+        response = requests.get(url, timeout=2)
 
-def resolve_input(input_str):
-    """
-    Resolves the input string to a BOLT-12 lno1 address.
-    If the input is already in lno1 format, it validates and returns it.
+        # Check for a valid response with required fields
+        if response.status_code == 200:
+            metadata = response.json()
+            if (
+                "callback" in metadata
+                and "minSendable" in metadata
+                and "maxSendable" in metadata
+            ):
+                return True
+        return False
+    except (requests.RequestException, ValueError):
+        return False
 
-    :param input_str: The input string (user@domain or BOLT-12 address).
-    :return: BOLT-12 lno1 address as a string or None if resolution/validation fails.
-    """
-    if is_bolt12_address(input_str):
-        print(f"Input is already a valid BOLT-12 address: {input_str}")
-        return input_str
-    elif is_user_domain_format(input_str):
-        print(f"Input is in user@domain format, attempting to resolve: {input_str}")
-        return resolve_user_domain_to_bolt12(input_str)
+
+def parse_bip21(uri):
+    # Parse the BIP21 URI
+    parsed = urllib.parse.urlparse(uri)
+
+    # Ensure it's a Bitcoin URI
+    if parsed.scheme != "bitcoin":
+        raise ValueError("Invalid BIP21 URI: Missing 'bitcoin' scheme")
+
+    # Extract the address and query components
+    address = parsed.path
+    query_params = urllib.parse.parse_qs(parsed.query)
+
+    # Check if 'lno' exists
+    lno = query_params.get("lno", [None])[0]
+
+    return {
+        "address": address,
+        "lno": lno,
+        "query_params": query_params,
+    }
+
+
+def resolve_payout_method(user_domain):
+    # Attempt to resolve the BOLT-12 address for the given user_domain
+    lno_address = resolve_recipient_via_bip353(user_domain)
+    if lno_address:
+        # If the resolution is successful, prepare to send payment via BOLT-12
+        print(f"Resolved BOLT-12 address for {user_domain}: {lno_address}")
+        # then we would send using sdk.prepare_send_payment(lno_address)
     else:
-        print(f"Invalid input format: {input_str}")
-        return None
+        lnurl_address = resolve_recipient_via_lud16(user_domain)
+        if lnurl_address:
+            print(f"Resolved LNURL address for {user_domain}: {lnurl_address}")
+            # sdk.lnurl_pay(lnurl_address)
+        else:
+            print(f"Failed to resolve recipient for {user_domain}")
+            return None
+
 
 # Example usage
 if __name__ == "__main__":
-    input_str = "simon@imaginator.com"  # Replace with the actual input (user@domain or BOLT-12 address)
-    result = resolve_input(input_str)
 
-    if result:
-        print(f"Resolved BOLT-12 address: {result}")
-    else:
-        print(f"Failed to resolve BOLT-12 address for input: {input_str}")
+    input_list = ["simon@imaginator.com", "imaginator@strike.me", "invalid@example.com"]
+    for user in input_list:
+        result = resolve_payout_method(user)
