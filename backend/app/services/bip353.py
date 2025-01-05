@@ -1,5 +1,4 @@
 import dns.resolver
-import re
 import urllib.parse
 import requests
 
@@ -26,7 +25,8 @@ def resolve_recipient_via_bip353(user_domain):
 
         # Join all TXT record strings together
         bip21_uri = "".join(
-            ["".join(r.decode("utf-8") for r in record.strings) for record in answers]
+            ["".join(r.decode("utf-8") for r in record.strings)
+             for record in answers]
         )
 
         parsed_bip21 = parse_bip21(bip21_uri)
@@ -118,6 +118,10 @@ def resolve_payout_method(user_domain):
 # Example usage
 if __name__ == "__main__":
 
-    input_list = ["simon@imaginator.com", "imaginator@strike.me", "invalid@example.com"]
+    input_list = [
+        "simon@imaginator.com",
+        "imaginator@strike.me",
+        "invalid@example.com"
+    ]
     for user in input_list:
         result = resolve_payout_method(user)
