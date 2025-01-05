@@ -1,15 +1,79 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from db import get_db
-from models.tip import Tip
-from schemas.tip import TipUpdate, TipCreate, TipOut
-from utils.security import get_current_user
-from services.lightning_service import create_invoice, get_balance
-from models.user import User
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from db import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from models.tip import Tip
+from models.user import User
+from schemas.tip import (LeaderboardReceived, LeaderboardSent, TipCreate,
+                         TipOut, TipUpdate)
+from services.lightning_service import create_invoice, get_balance
+from sqlalchemy import desc, func
+from sqlalchemy.orm import Session
+from utils.security import get_current_user
+
 router = APIRouter(prefix="/tips", tags=["tips"])
 
+
+@router.get("/leaderboard_received", response_model=list[LeaderboardReceived])
+def get_most_tipped_users(db: Session = Depends(get_db)):
+    # Calculate the timestamp for 24 hours ago
+    last_24_hours = datetime.utcnow() - timedelta(hours=24)
+
+    # Query the database for tips marked as paid_in=True and created within the last 24 hours
+    tips = db.query(
+        Tip.recipient_twitter_username,
+        func.sum(Tip.amount_sats).label("total_amount_sats"),
+        func.count(Tip.id).label("tip_count")
+    ).filter(
+        Tip.paid_in == True,
+        Tip.created_at >= last_24_hours
+    ).group_by(
+        Tip.recipient_twitter_username
+    ).order_by(
+        desc("total_amount_sats")
+    ).limit(10).all()
+
+    # Convert the query result to a list of UserTipSummary
+    result = [
+        LeaderboardReceived(
+            recipient_twitter_username=tip.recipient_twitter_username,
+            total_amount_sats=tip.total_amount_sats,
+            tip_count=tip.tip_count
+        )
+    for tip in tips]
+
+    return result
+
+@router.get("/leaderboard_sent", response_model=list[LeaderboardSent])
+def get_most_active_tippers(db: Session = Depends(get_db)):
+    # Calculate the timestamp for 24 hours ago
+    last_24_hours = datetime.utcnow() - timedelta(hours=24)
+
+    # Query the database for tips created within the last 24 hours
+    tips = db.query(
+        Tip.tipper_display_name,
+        func.sum(Tip.amount_sats).label("total_amount_sats"),
+        func.count(Tip.id).label("tip_count")
+    ).filter(
+        Tip.paid_in == True,
+        Tip.created_at >= last_24_hours
+    ).group_by(
+        Tip.tipper_display_name
+    ).order_by(
+        desc("total_amount_sats")
+    ).limit(10).all()
+
+    # Convert the query result to a list of LeaderboardSent
+    result = [
+        LeaderboardSent(
+            tipper_display_name=tip.tipper_display_name,
+            total_amount_sats=tip.total_amount_sats,
+            tip_count=tip.tip_count
+        )
+    for tip in tips]
+
+    return result
 
 @router.post("/", response_model=TipOut)
 def create_tip(

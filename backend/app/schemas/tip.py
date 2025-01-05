@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, HttpUrl, validator
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel, Field, HttpUrl, validator
 
 
 class TipCreate(BaseModel):
@@ -30,3 +31,13 @@ class TipOut(BaseModel):
 class TipUpdate(BaseModel):
     paid_in: bool
     paid_out: bool
+
+class LeaderboardReceived(BaseModel):
+    recipient_twitter_username: str
+    total_amount_sats: int
+    tip_count: int
+
+class LeaderboardSent(BaseModel):
+    tipper_display_name: str
+    total_amount_sats: int
+    tip_count: int
