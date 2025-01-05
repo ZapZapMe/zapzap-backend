@@ -41,9 +41,10 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
             total_amount_sats=tip.total_amount_sats,
             tip_count=tip.tip_count
         )
-    for tip in tips]
+        for tip in tips]
 
     return result
+
 
 @router.get("/leaderboard_sent", response_model=list[LeaderboardSent])
 def get_most_active_tippers(db: Session = Depends(get_db)):
@@ -71,9 +72,10 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
             total_amount_sats=tip.total_amount_sats,
             tip_count=tip.tip_count
         )
-    for tip in tips]
+        for tip in tips]
 
     return result
+
 
 @router.post("/", response_model=TipOut)
 def create_tip(
@@ -82,28 +84,35 @@ def create_tip(
     # current_user: User = Depends(get_current_user),
 ):
     try:
-        receiver = db.query(User).filter(User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
+        receiver = db.query(User).filter(
+            User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
         if receiver and not receiver.has_account:
-            logging.warning(f"Receiver @{receiver.twitter_username} exists but has not completed account setup.")
+            logging.warning(
+                f"Receiver @{receiver.twitter_username} exists but has not completed account setup.")
 
         if not receiver:
             receiver = User(
-                twitter_username=tip_data.recipient_twitter_username.lstrip("@"),
+                twitter_username=tip_data.recipient_twitter_username.lstrip(
+                    "@"),
                 has_account=False
             )
             db.add(receiver)
             db.commit()
             db.refresh(receiver)
-            logging.info(f"Created placeholder user for @{receiver.twitter_username}")
-        
+            logging.info(
+                f"Created placeholder user for @{receiver.twitter_username}")
+
         if not receiver.bolt12_address:
-            logging.warning(f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
-            print(f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
-        
-        bolt11, payment_hash, tip_fee = create_invoice(
-            tip_data.amount_sats,
-            f"Tip from anonymous - {tip_data.comment}",
-        )
+            logging.warning(
+                f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
+            print(
+                f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
+
+        bolt11, payment_hash, tip_fee = create_invoice(tip_data.tweet_url,
+                                                       tip_data.amount_sats,
+                                                       f"Tip from anonymous - {
+                                                           tip_data.comment}",
+                                                       )
 
         new_tip = Tip(
             tipper_display_name=tip_data.tipper_display_name or "anonymous",
@@ -131,8 +140,8 @@ def create_tip(
     except Exception as e:
         print(f"Unexpected error occurred: {e}")
         logging.error(f"Unexpected error occurred: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to create tip. Reason: {str(e)}")
-
+        raise HTTPException(
+            status_code=400, detail=f"Failed to create tip. Reason: {str(e)}")
 
 
 @router.get("/", response_model=list[TipOut])

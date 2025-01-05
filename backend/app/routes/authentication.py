@@ -22,7 +22,6 @@ twitter = oauth.register(
     client_kwargs={"token_placement": "header"},
 )
 
-
 @app.get("/")
 async def home():
     return {"message": "Welcome to the Twitter OAuth Demo!"}

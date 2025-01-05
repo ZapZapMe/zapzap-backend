@@ -1,4 +1,5 @@
 authlib
+bolt11
 breez_sdk_liquid
 cloud-sql-python-connector[pg8000]
 databases

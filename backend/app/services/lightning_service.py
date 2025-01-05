@@ -18,6 +18,7 @@ from breez_sdk_liquid import (
     SendPaymentRequest,
     PayAmount,
     LiquidNetwork,
+    parse_invoice,
     SdkEvent)
 from db import SessionLocal
 from models.tip import Tip
@@ -56,6 +57,7 @@ def forward_payment_to_receiver(tip_id: int):
                 destination=bolt12_offer,
                 amount=optional_amount
             )
+            print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             prepare_send_resp = sdk_services.prepare_send_payment(prepare_send_req)
             logging.info(f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_send_resp.fees_sat} sats")
 
@@ -110,14 +112,18 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
         tip = db.query(Tip).filter(Tip.ln_payment_hash == invoice_or_hash).first()
         if not tip:
             tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
+        if not tip:
+            print("No tip found")
+            return
 
         if tip and not tip.paid_in:
             tip.paid_in = True
             db.commit()
             logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
-            
+
+        if not tip.paid_out:
             try:
-                payment_hash = forward_payment_to_receiver(tip.id)
+                payment_hash =  forward_payment_to_receiver(tip.id)
                 print(payment_hash)
                 if payment_hash:
                     tip.forward_payment_hash = payment_hash
@@ -139,6 +145,7 @@ class SdkListener(breez_sdk_liquid.EventListener):
 
 def add_event_listener(sdk: BindingLiquidSdk, listener: SdkListener):
     try:
+        mark_invoice_as_paid_in_db
         listener_id = sdk.add_event_listener(listener)
         logging.info(f"Listener successfully added with ID: {listener_id}")
         return listener_id
@@ -150,7 +157,7 @@ class MyNodelessListener(SdkListener):
     def on_event(self, sdk_event: SdkEvent):
         logging.info(f"[MyNodelessListener] Received event: {sdk_event}")
         print(f"[MyNodelessListener] Received event: {sdk_event}")
-        if isinstance(sdk_event, breez_sdk_liquid.SdkEvent.PAYMENT_PENDING):
+        if isinstance(sdk_event, breez_sdk_liquid.SdkEvent.PAYMENT_WAITING_CONFIRMATION):
             payment = sdk_event.details
             if payment.destination:
                 payment_invoice = payment.destination
@@ -261,7 +268,7 @@ def get_balance():
     # }
 
 
-def create_invoice(amount_sats: int, description: str = "Tip invoice"):
+def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip invoice"):
     """
     Creates a lightning invoice. Returns the BOLT11 invoice string.
     """
@@ -281,19 +288,23 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 
     receive_req = ReceivePaymentRequest(
         prepare_response=prepare_resp,
-        description = f"ZapZap for {Tip.tweet_url}",
+        description = f"ZapZap for {tweet_url}",
         use_description_hash=False,
     )
 
     receive_res = sdk_services.receive_payment(receive_req)
+    print("REQUEST: ", receive_req)
 
     bolt11_invoice = receive_res.destination
+    parse_req = parse_invoice(bolt11_invoice)
+    payment_hash = parse_req.payment_hash
+
 
     # amount_msat = amount_sats * 1000
     # request = breez_sdk_liquid.ReceivePaymentRequest(amount_msat, description)
     # response = sdk_services.receive_payment(request)
     # response.ln_invoice is the BOLT11 invoice
-    return (bolt11_invoice, None, invoice_fee)
+    return (bolt11_invoice, payment_hash, invoice_fee)
 
 
 # try:
@@ -330,6 +341,7 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
         if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
             print("Payment paid when application starts")
             bolt11_of_this_payment = p.destination
+            print("Bolt11 of the unpaid invoice: ", bolt11_of_this_payment)
             mark_invoice_as_paid_in_db(bolt11_of_this_payment)
             count_marked += 1
     logging.info(
