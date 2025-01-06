@@ -241,7 +241,7 @@ def connect_breez(restore_only: bool = False):
         breez_api_key=settings.BREEZ_API_KEY,
         network=breez_sdk_liquid.LiquidNetwork.MAINNET,
     )
-    config.working_dir = settings.BREEZ_WORKING_DIR
+    config.working_dir = settings.BREEZ_DATA_PATH
 
     # Connect request, specifying restore_only if you already have a node
     connect_request = breez_sdk_liquid.ConnectRequest(config, mnemonic)
