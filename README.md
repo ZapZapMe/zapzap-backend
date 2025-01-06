@@ -32,3 +32,14 @@ docker push europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:lat
 docker push zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
 gcloud run deploy cloudrun-service  --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
 ```
+
+## Development Setup
+
+- Linting: Ruff
+- Fomatting: Black
+
+1. Install dependencies:
+
+   ```bash
+   pip install black ruff pre-commit
+   ```

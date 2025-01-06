@@ -1,0 +1,10 @@
+[tool.black]
+line-length = 60
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "B"]
+ignore = ["E203", "B008", "B904", "F841", "B018", "F541" , "E712" , "F401" , "F821", "F811"]
+
+[tool.isort]
+profile = "google"
