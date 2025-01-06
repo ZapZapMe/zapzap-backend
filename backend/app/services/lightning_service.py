@@ -19,8 +19,8 @@ from config import settings
 from db import SessionLocal
 from models.tip import Tip
 from models.user import User
-from sqlalchemy.orm import Session
 from services.bip353 import resolve_recipient_via_bip353
+from sqlalchemy.orm import Session
 
 # from sqlalchemy.orm import Session
 
@@ -30,19 +30,26 @@ sdk_services = None
 
 
 def send_bolt12_payment(bolt12_offer: str, amount_sats: int):
+    ross_bolt12 = "lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtn2mq3gzvt8mkq4fy7vgt34s3kkdpllgshz3ak3d8st0texhm2hqqszvedh6tvvyt2zyvcl39chzqja08y3zu27f8jjl7mgyyp2kw5da6cqqvc3naftwk24xr90uqhwqv2p2znatq2tgh63ny3vd4slykgcx87ftuh28jwpvygshf34gfc8ywnkxlw89dh2qvmz9da8dw6nx5gty895tllv3t2lzk02l7vzna3m9dnpphjftncwvqqs4zrs72t38qscfe49vnwwmucwhg"
+
     try:
         optional_amount = PayAmount.RECEIVER(amount_sats)
-        prepare_req = PrepareSendRequest(destination=bolt12_offer, amount=optional_amount)
+        print(bolt12_offer)
+        print(amount_sats)
+        prepare_req = PrepareSendRequest(destination=ross_bolt12, amount=optional_amount)
         prepare_res = sdk_services.prepare_send_payment(prepare_req)
         logging.info(f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_res.fees_sat} sats")
-        send_req = SendPaymentRequest(prepare_response=prepare_res)
+        send_req = SendPaymentRequest(prepare_res)
+        print(send_req)
         send_res = sdk_services.send_payment(send_req)
+        print("SEND REQUEST", send_res)
         logging.info(f"Payment sent successfully. Payment Hash: {send_res.payment}")
         return send_res.payment
     except Exception as e:
         logging.error(f"Error creating PayAmount: {e}")
         return None
-    
+
+
 def send_lnurl_payment(lnurl: str, amount_sats: int):
     pass
 
@@ -69,6 +76,7 @@ def forward_payment_to_receiver(tip_id: int):
         if bolt12_offer:
             logging.info(f"[BIP353] Resolved BOLT12 offer: {bolt12_offer}")
             payment_hash = send_bolt12_payment(bolt12_offer, tip.amount_sats)
+            print("AAAAAA: ", payment_hash)
         else:
             logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
             payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
@@ -80,7 +88,9 @@ def forward_payment_to_receiver(tip_id: int):
             logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{tip.recipient_twitter_username}")
             return payment_hash
         else:
-            logging.error(f"No payment options found for sending {tip.amount_sats} sats to @{tip.recipient_twitter_username}")
+            logging.error(
+                f"No payment options found for sending {tip.amount_sats} sats to @{tip.recipient_twitter_username}"
+            )
             return None
 
 
@@ -128,7 +138,6 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
         if not tip:
             tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
         if not tip:
-            print("No tip found")
             return
 
         if tip and not tip.paid_in:
@@ -225,9 +234,7 @@ def connect_breez(restore_only: bool = False):
     # In production, store your real mnemonic in a safe place (not in code).
     # For now, let's assume you have it in environment:
     # e.g. MNEMONIC="abandon abandon abandon ... rocket manual"
-    mnemonic = (
-        settings.BREEZ_MNEMONIC
-    )
+    mnemonic = settings.BREEZ_MNEMONIC
 
     # Build the Breez config
     config = breez_sdk_liquid.default_config(
@@ -303,7 +310,6 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
     )
 
     receive_res = sdk_services.receive_payment(receive_req)
-    print("REQUEST: ", receive_req)
 
     bolt11_invoice = receive_res.destination
     parse_req = parse_invoice(bolt11_invoice)
@@ -337,7 +343,6 @@ def pull_unpaid_invoices_since_broken(last_timestamp: datetime):
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
     last_timestamp = 0
-    print("Last Timestamp: ", last_timestamp)
 
     try:
         req = breez_sdk_liquid.ListPaymentsRequest(
@@ -346,23 +351,18 @@ def pull_unpaid_invoices_since_broken(last_timestamp: datetime):
             offset=0,
             limit=50,
         )
-        print("Request", req)
         new_payments = sdk_services.list_payments(req)
-        print("New Payments: ", new_payments)
         count_marked = 0
 
         for p in new_payments:
-            print("Payment: ", p)
             if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
-                print("Payment paid when application starts")
                 bolt11_of_this_payment = p.destination
-                print("Bolt11 of the unpaid invoice: ", bolt11_of_this_payment)
                 mark_invoice_as_paid_in_db(bolt11_of_this_payment)
                 count_marked += 1
         logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
     except Exception as e:
         logging.error(f"Error listing payments: {e}")
-        
+
 
 def extract_payment_hash(invoice: str) -> str:
     decoded_invoice = lnurl.decode(invoice)
@@ -374,15 +374,13 @@ def extract_payment_hash(invoice: str) -> str:
         raise ValueError("Payment hash not found in the invoice")
 
 
-
-
 def pull_unpaid_invoices_since(last_timestamp: datetime):
     """
     Lists all payments (both sent and received).
     """
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
-    
+
     last_timestamp = 0
 
     req = breez_sdk_liquid.ListPaymentsRequest(
@@ -392,16 +390,11 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
         limit=50,
     )
     new_payments = sdk_services.list_payments(req)
-    print("New Payments: ", new_payments)
     count_marked = 0
 
     for p in new_payments:
         if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
-            print("Payment paid when application starts")
             bolt11_of_this_payment = p.destination
-            print("Bolt11 of the unpaid invoice: ", bolt11_of_this_payment)
             mark_invoice_as_paid_in_db(bolt11_of_this_payment)
             count_marked += 1
-    logging.info(
-        f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!"
-    )
+    logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
