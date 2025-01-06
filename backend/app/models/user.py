@@ -10,9 +10,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     twitter_username: Mapped[str] = mapped_column(index=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    bolt12_address: Mapped[str] = mapped_column(nullable=True, index=True)
+    wallet_address: Mapped[str] = mapped_column(nullable=True, index=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
-    has_account: Mapped[bool] = mapped_column(default=False)  # New column
 
 
     sent_tips: Mapped[List["Tip"]] = relationship(back_populates="tipper_user")

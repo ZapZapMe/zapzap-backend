@@ -23,15 +23,15 @@ def resolve_recipient_via_bip353(user_domain):
         # Perform the DNS TXT record query
         answers = dns.resolver.resolve(txt_query, "TXT")
 
-        # Join all TXT record strings together
+        # Join all TXT record strings together (255 character max)
         bip21_uri = "".join(
             ["".join(r.decode("utf-8") for r in record.strings)
              for record in answers]
         )
 
+        # bitcoin:?lno=lno1XXXXXXXX
         parsed_bip21 = parse_bip21(bip21_uri)
         lno_address = parsed_bip21.get("lno")
-
         if lno_address:
             return lno_address
         else:
@@ -65,12 +65,8 @@ def resolve_recipient_via_lud16(user_domain):
         # Check for a valid response with required fields
         if response.status_code == 200:
             metadata = response.json()
-            if (
-                "callback" in metadata
-                and "minSendable" in metadata
-                and "maxSendable" in metadata
-            ):
-                return True
+            if "callback" in metadata and "minSendable" in metadata and "maxSendable" in metadata:
+                return user_domain
         return False
     except (requests.RequestException, ValueError):
         return False
@@ -91,11 +87,7 @@ def parse_bip21(uri):
     # Check if 'lno' exists
     lno = query_params.get("lno", [None])[0]
 
-    return {
-        "address": address,
-        "lno": lno,
-        "query_params": query_params,
-    }
+    return {"lno": lno}
 
 
 def resolve_payout_method(user_domain):
@@ -104,15 +96,16 @@ def resolve_payout_method(user_domain):
     if lno_address:
         # If the resolution is successful, prepare to send payment via BOLT-12
         print(f"Resolved BOLT-12 address for {user_domain}: {lno_address}")
+        return lno_address
         # then we would send using sdk.prepare_send_payment(lno_address)
-    else:
-        lnurl_address = resolve_recipient_via_lud16(user_domain)
-        if lnurl_address:
-            print(f"Resolved LNURL address for {user_domain}: {lnurl_address}")
-            # sdk.lnurl_pay(lnurl_address)
-        else:
-            print(f"Failed to resolve recipient for {user_domain}")
-            return None
+
+    lnurl_address = resolve_recipient_via_lud16(user_domain)
+    if lnurl_address:
+        print(f"Resolved LNURL address for {user_domain}: {lnurl_address}")
+        return user_domain
+    
+    print(f"Failed to resolve payout method for {user_domain}")
+    return None
 
 
 # Example usage

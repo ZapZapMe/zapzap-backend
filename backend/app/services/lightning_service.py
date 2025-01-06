@@ -5,6 +5,7 @@ import breez_sdk_liquid
 import lnurl
 from breez_sdk_liquid import (
     BindingLiquidSdk,
+    EventListener,
     PayAmount,
     PaymentMethod,
     PrepareReceiveRequest,
@@ -19,12 +20,31 @@ from db import SessionLocal
 from models.tip import Tip
 from models.user import User
 from sqlalchemy.orm import Session
+from services.bip353 import resolve_recipient_via_bip353
 
 # from sqlalchemy.orm import Session
 
 
 # Optional: define a global variable for 'sdk_services'
 sdk_services = None
+
+
+def send_bolt12_payment(bolt12_offer: str, amount_sats: int):
+    try:
+        optional_amount = PayAmount.RECEIVER(amount_sats)
+        prepare_req = PrepareSendRequest(destination=bolt12_offer, amount=optional_amount)
+        prepare_res = sdk_services.prepare_send_payment(prepare_req)
+        logging.info(f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_res.fees_sat} sats")
+        send_req = SendPaymentRequest(prepare_response=prepare_res)
+        send_res = sdk_services.send_payment(send_req)
+        logging.info(f"Payment sent successfully. Payment Hash: {send_res.payment}")
+        return send_res.payment
+    except Exception as e:
+        logging.error(f"Error creating PayAmount: {e}")
+        return None
+    
+def send_lnurl_payment(lnurl: str, amount_sats: int):
+    pass
 
 
 def forward_payment_to_receiver(tip_id: int):
@@ -38,36 +58,35 @@ def forward_payment_to_receiver(tip_id: int):
             return None
 
         receiver = db.query(User).filter(User.twitter_username == tip.recipient_twitter_username).first()
-        if not receiver or not receiver.bolt12_address:
-            logging.error(f"Receiver @{tip.recipient_twitter_username} not found or does not have BOLT12 address.")
+        if not receiver or not receiver.wallet_address:
+            logging.error(f"Receiver @{tip.recipient_twitter_username} not found or does not have waller address.")
             return None
 
-        amount_sats = tip.amount_sats
-        bolt12_offer = receiver.bolt12_address
+        address_str = receiver.wallet_address
+        logging.info(f"Forwarding {tip.amount_sats} sats to @{tip.recipient_twitter_username} at address {address_str}")
 
-        try:
-            optional_amount = PayAmount.RECEIVER(amount_sats)
-            prepare_send_req = PrepareSendRequest(destination=bolt12_offer, amount=optional_amount)
-            print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-            prepare_send_resp = sdk_services.prepare_send_payment(prepare_send_req)
-            logging.info(
-                f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_send_resp.fees_sat} sats"
-            )
+        bolt12_offer = resolve_recipient_via_bip353(address_str)
+        if bolt12_offer:
+            logging.info(f"[BIP353] Resolved BOLT12 offer: {bolt12_offer}")
+            payment_hash = send_bolt12_payment(bolt12_offer, tip.amount_sats)
+        else:
+            logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
+            payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
 
-            send_req = SendPaymentRequest(prepare_response=prepare_send_resp)
-            send_res = sdk_services.send_payment(send_req)
-            logging.info(f"Payment sent successfully. Payment Hash: {send_res.payment}")
-
-            return send_res.payment
-
-        except Exception as e:
-            logging.error(f"Error forwarding the payment for Tip ID {tip_id}: {e}")
+        if payment_hash:
+            tip.forward_payment_hash = payment_hash
+            tip.paid_out = True
+            db.commit()
+            logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{tip.recipient_twitter_username}")
+            return payment_hash
+        else:
+            logging.error(f"No payment options found for sending {tip.amount_sats} sats to @{tip.recipient_twitter_username}")
             return None
 
 
 def forward_pending_tips_for_user(user_id: int, db: Session):
     user = db.query(User).filter(User.id == user_id).first()
-    if not user or not user.bolt12_address:
+    if not user or not user.wallet_address:
         logging.error(f"User ID {user_id} does not exist or lacks a BOLT12 address")
         return
     pending_tips = (
@@ -94,7 +113,7 @@ def forward_pending_tips_for_user(user_id: int, db: Session):
                 tip.paid_out = True
                 db.commit()
                 logging.info(
-                    f"Successfully forwarded {tip.amount_sats} sats for the Tip #{tip.id} to {user.bolt12_address}"
+                    f"Successfully forwarded {tip.amount_sats} sats for the Tip #{tip.id} to {user.wallet_address}"
                 )
             else:
                 logging.error(f"Failed to forward Tip #{tip.id} for user {user.twitter_username}")
@@ -136,7 +155,7 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
             logging.info("[mark_invoice_as_paid_in_db] no match or already paid!")
 
 
-class SdkListener(breez_sdk_liquid.EventListener):
+class SdkListener(EventListener):
     def on_event(sdk_event: SdkEvent):
         logging.debug("Received event ", sdk_event)
         print("Received event ", sdk_event)
@@ -208,8 +227,6 @@ def connect_breez(restore_only: bool = False):
     # e.g. MNEMONIC="abandon abandon abandon ... rocket manual"
     mnemonic = (
         settings.BREEZ_MNEMONIC
-        if hasattr(settings, "BREEZ_MNEMONIC")
-        else "donor vacuum copy narrow clown prosper another shift often robot torch below"
     )
 
     # Build the Breez config
@@ -313,31 +330,39 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
 #     raise
 
 
-def pull_unpaid_invoices_since(last_timestamp: datetime):
+def pull_unpaid_invoices_since_broken(last_timestamp: datetime):
     """
     Lists all payments (both sent and received).
     """
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
+    last_timestamp = 0
+    print("Last Timestamp: ", last_timestamp)
 
-    req = breez_sdk_liquid.ListPaymentsRequest(
-        [breez_sdk_liquid.PaymentType.RECEIVE],
-        from_timestamp=last_timestamp,
-        offset=0,
-        limit=50,
-    )
-    new_payments = sdk_services.list_payments(req)
-    count_marked = 0
+    try:
+        req = breez_sdk_liquid.ListPaymentsRequest(
+            [breez_sdk_liquid.PaymentType.RECEIVE],
+            from_timestamp=last_timestamp,
+            offset=0,
+            limit=50,
+        )
+        print("Request", req)
+        new_payments = sdk_services.list_payments(req)
+        print("New Payments: ", new_payments)
+        count_marked = 0
 
-    for p in new_payments:
-        if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
-            print("Payment paid when application starts")
-            bolt11_of_this_payment = p.destination
-            print("Bolt11 of the unpaid invoice: ", bolt11_of_this_payment)
-            mark_invoice_as_paid_in_db(bolt11_of_this_payment)
-            count_marked += 1
-    logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
-
+        for p in new_payments:
+            print("Payment: ", p)
+            if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
+                print("Payment paid when application starts")
+                bolt11_of_this_payment = p.destination
+                print("Bolt11 of the unpaid invoice: ", bolt11_of_this_payment)
+                mark_invoice_as_paid_in_db(bolt11_of_this_payment)
+                count_marked += 1
+        logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
+    except Exception as e:
+        logging.error(f"Error listing payments: {e}")
+        
 
 def extract_payment_hash(invoice: str) -> str:
     decoded_invoice = lnurl.decode(invoice)
@@ -347,3 +372,36 @@ def extract_payment_hash(invoice: str) -> str:
         return payment_hash
     else:
         raise ValueError("Payment hash not found in the invoice")
+
+
+
+
+def pull_unpaid_invoices_since(last_timestamp: datetime):
+    """
+    Lists all payments (both sent and received).
+    """
+    if not sdk_services:
+        raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
+    
+    last_timestamp = 0
+
+    req = breez_sdk_liquid.ListPaymentsRequest(
+        [breez_sdk_liquid.PaymentType.RECEIVE],
+        from_timestamp=last_timestamp,
+        offset=0,
+        limit=50,
+    )
+    new_payments = sdk_services.list_payments(req)
+    print("New Payments: ", new_payments)
+    count_marked = 0
+
+    for p in new_payments:
+        if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
+            print("Payment paid when application starts")
+            bolt11_of_this_payment = p.destination
+            print("Bolt11 of the unpaid invoice: ", bolt11_of_this_payment)
+            mark_invoice_as_paid_in_db(bolt11_of_this_payment)
+            count_marked += 1
+    logging.info(
+        f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!"
+    )

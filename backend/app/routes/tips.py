@@ -7,7 +7,7 @@ from models.tip import Tip
 from models.user import User
 from schemas.tip import (LeaderboardReceived, LeaderboardSent, TipCreate,
                          TipOut, TipUpdate)
-from services.lightning_service import create_invoice, get_balance
+from services.lightning_service import create_invoice
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 from utils.security import get_current_user
@@ -86,33 +86,19 @@ def create_tip(
     try:
         receiver = db.query(User).filter(
             User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
-        if receiver and not receiver.has_account:
-            logging.warning(
-                f"Receiver @{receiver.twitter_username} exists but has not completed account setup.")
+            
+        if receiver:
+            if not receiver.wallet_address:
+                logging.warning(f"Receiver {receiver.recipient_twitter_username} does not have a bolt12 address. Tip will be held.")
 
-        if not receiver:
-            receiver = User(
-                twitter_username=tip_data.recipient_twitter_username.lstrip(
-                    "@"),
-                has_account=False
+        else:
+            logging.warning(f"Receiver {tip_data.recipient_twitter_username} not found. Tip will be held until user registers.")
+
+        bolt11, payment_hash, tip_fee = create_invoice(
+            tip_data.tweet_url,
+            tip_data.amount_sats,
+            f"Tip from anonymous - {tip_data.comment}",
             )
-            db.add(receiver)
-            db.commit()
-            db.refresh(receiver)
-            logging.info(
-                f"Created placeholder user for @{receiver.twitter_username}")
-
-        if not receiver.bolt12_address:
-            logging.warning(
-                f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
-            print(
-                f"Receiver @{receiver.twitter_username} does not have a BOLT12 address. Payments will be held in the account.")
-
-        bolt11, payment_hash, tip_fee = create_invoice(tip_data.tweet_url,
-                                                       tip_data.amount_sats,
-                                                       f"Tip from anonymous - {
-                                                           tip_data.comment}",
-                                                       )
 
         new_tip = Tip(
             tipper_display_name=tip_data.tipper_display_name or "anonymous",
@@ -135,14 +121,12 @@ def create_tip(
 
     except HTTPException as http_exc:
         logging.error(f"HTTP error occurred: {http_exc.detail}")
-        print(f"HTTP error occurred: {http_exc.detail}")
         raise
     except Exception as e:
-        print(f"Unexpected error occurred: {e}")
         logging.error(f"Unexpected error occurred: {e}")
         raise HTTPException(
             status_code=400, detail=f"Failed to create tip. Reason: {str(e)}")
-
+    
 
 @router.get("/", response_model=list[TipOut])
 def list_tips(db: Session = Depends(get_db)):

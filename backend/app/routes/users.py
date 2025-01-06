@@ -6,6 +6,7 @@ import logging
 from schemas.user import UserCreate, UserOut, UserUpdate
 from utils.security import get_current_user
 from services.lightning_service import forward_payment_to_receiver
+from services.bip353 import resolve_payout_method
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -20,15 +21,15 @@ def update_user_profile(user_update: UserUpdate, db: Session = Depends(get_db), 
         raise HTTPException(status_code=404, detail="User not found!")
     
     updated = False
-    if user_update.bolt12_address and user.bolt12_address != user_update.bolt12_address:
-        user.bolt12_address = user_update.bolt12_address
+    if user_update.wallet_address and user.wallet_address != user_update.wallet_address:
+        user.wallet_address = user_update.wallet_address
         updated = True
 
     db.commit()
     db.refresh(user)
 
     if updated:
-        logging.info(f"User @{user.twitter_username} updated their BOLT12 address. Initiating forwarding of pending tips.")
+        logging.info(f"User @{user.twitter_username} updated their wallet address. Initiating forwarding of pending tips.")
         forward_payment_to_receiver(user.id)
     return user
 

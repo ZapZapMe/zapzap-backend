@@ -54,14 +54,10 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
 
 
     if not user:
-        user = User(twitter_username=twitter_username, has_account=True)
+        user = User(twitter_username=twitter_username)
         db.add(user)
-        user.has_account = True  # Update the user's account status
-    else:
-        user.has_account = True  # Update the user's account status
-
-    db.commit()
-    db.refresh(user)  # Refresh the user object to reflect committed changes
+        db.commit()
+        db.refresh(user)  # Refresh the user object to reflect committed changes
 
 
     access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)

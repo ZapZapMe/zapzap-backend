@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from config import settings
 from routes import users, auths, tips
 from db import Base, engine, SessionLocal
-from services.lightning_service import connect_breez, pull_unpaid_invoices_since, add_liquid_event_listener, get_balance, create_invoice
+from services.lightning_service import connect_breez, pull_unpaid_invoices_since, add_liquid_event_listener, create_invoice
 from utils.sync_state import get_last_sync_state, set_last_sync_timestamp 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -67,7 +67,7 @@ def test_invoice():
     invoice, temp, temp1= create_invoice(amount, "Test invoice")
     return {"invoice": invoice}
 
-@app.get("/lightning/test-balance")
-def test_balance():
-    return get_balance()
+# @app.get("/lightning/test-balance")
+# def test_balance():
+#     return get_balance()
 
