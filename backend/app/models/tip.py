@@ -28,6 +28,6 @@ class Tip(Base):
     paid_out: Mapped[bool] = mapped_column(default=False)
     forward_payment_hash: Mapped[str] = mapped_column(nullable=True, index=True)
 
-    created_at: Mapped[datetime] = mapped_column(default=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     tipper_user: Mapped["User"] = relationship(back_populates="sent_tips")

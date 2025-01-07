@@ -6,8 +6,11 @@ import lnurl
 from breez_sdk_liquid import (
     BindingLiquidSdk,
     EventListener,
+    InputType,
+    LnUrlPayRequest,
     PayAmount,
     PaymentMethod,
+    PrepareLnUrlPayRequest,
     PrepareReceiveRequest,
     PrepareSendRequest,
     ReceivePaymentRequest,
@@ -30,19 +33,17 @@ sdk_services = None
 
 
 def send_bolt12_payment(bolt12_offer: str, amount_sats: int):
-    ross_bolt12 = "lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtn2mq3gzvt8mkq4fy7vgt34s3kkdpllgshz3ak3d8st0texhm2hqqszvedh6tvvyt2zyvcl39chzqja08y3zu27f8jjl7mgyyp2kw5da6cqqvc3naftwk24xr90uqhwqv2p2znatq2tgh63ny3vd4slykgcx87ftuh28jwpvygshf34gfc8ywnkxlw89dh2qvmz9da8dw6nx5gty895tllv3t2lzk02l7vzna3m9dnpphjftncwvqqs4zrs72t38qscfe49vnwwmucwhg"
+    # ross_bolt12 = "lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtn2mq3gzvt8mkq4fy7vgt34s3kkdpllgshz3ak3d8st0texhm2hqqszvedh6tvvyt2zyvcl39chzqja08y3zu27f8jjl7mgyyp2kw5da6cqqvc3naftwk24xr90uqhwqv2p2znatq2tgh63ny3vd4slykgcx87ftuh28jwpvygshf34gfc8ywnkxlw89dh2qvmz9da8dw6nx5gty895tllv3t2lzk02l7vzna3m9dnpphjftncwvqqs4zrs72t38qscfe49vnwwmucwhg"
 
     try:
         optional_amount = PayAmount.RECEIVER(amount_sats)
-        print(bolt12_offer)
-        print(amount_sats)
-        prepare_req = PrepareSendRequest(destination=ross_bolt12, amount=optional_amount)
+        prepare_req = PrepareSendRequest(destination=bolt12_offer, amount=optional_amount)
         prepare_res = sdk_services.prepare_send_payment(prepare_req)
         logging.info(f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_res.fees_sat} sats")
         send_req = SendPaymentRequest(prepare_res)
-        print(send_req)
+        print("SEND REQUEST", send_req)
         send_res = sdk_services.send_payment(send_req)
-        print("SEND REQUEST", send_res)
+        print("SEND RESPONSE", send_res)
         logging.info(f"Payment sent successfully. Payment Hash: {send_res.payment}")
         return send_res.payment
     except Exception as e:
@@ -50,8 +51,32 @@ def send_bolt12_payment(bolt12_offer: str, amount_sats: int):
         return None
 
 
-def send_lnurl_payment(lnurl: str, amount_sats: int):
-    pass
+def send_lnurl_payment(lnurl_address: str, amount_sats: int):
+    try:
+        parsed_input = breez_sdk_liquid.parse(lnurl_address)
+        if isinstance(parsed_input, InputType.LN_URL_PAY):
+            amount_msat = amount_sats * 1000
+            optional_comment = "test"
+            optional_validate_success_action_url = True
+
+            req = PrepareLnUrlPayRequest(
+                parsed_input.data, amount_msat, optional_comment, optional_validate_success_action_url
+            )
+            prepare_response = sdk_services.prepare_lnurl_pay(req)
+            print("LNURL Response: ", prepare_response)
+
+            # If the fees are acceptable, continue to create the LNURL Pay
+            fees_sat = prepare_response.fees_sat
+            logging.debug("Fees: ", fees_sat, " sats")
+
+            pay_req = LnUrlPayRequest(prepare_response)
+            pay_res = sdk_services.lnurl_pay(pay_req)
+
+            print(f"LNURL payment successful.")
+    except Exception as error:
+        print(f"Issue with LNURL payment: {error}")
+        logging.error(error)
+        raise
 
 
 def forward_payment_to_receiver(tip_id: int):
@@ -76,7 +101,6 @@ def forward_payment_to_receiver(tip_id: int):
         if bolt12_offer:
             logging.info(f"[BIP353] Resolved BOLT12 offer: {bolt12_offer}")
             payment_hash = send_bolt12_payment(bolt12_offer, tip.amount_sats)
-            print("AAAAAA: ", payment_hash)
         else:
             logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
             payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
@@ -148,7 +172,6 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
         if not tip.paid_out:
             try:
                 payment_hash = forward_payment_to_receiver(tip.id)
-                print(payment_hash)
                 if payment_hash:
                     tip.forward_payment_hash = payment_hash
                     tip.paid_out = True
@@ -242,6 +265,7 @@ def connect_breez(restore_only: bool = False):
         network=breez_sdk_liquid.LiquidNetwork.MAINNET,
     )
     config.working_dir = settings.BREEZ_DATA_PATH
+    config.cache_dir = "/tmp/breez_cache_dir"
 
     # Connect request, specifying restore_only if you already have a node
     connect_request = breez_sdk_liquid.ConnectRequest(config, mnemonic)
@@ -352,6 +376,7 @@ def pull_unpaid_invoices_since_broken(last_timestamp: datetime):
             limit=50,
         )
         new_payments = sdk_services.list_payments(req)
+        print("NEW PAYMENTS", new_payments)
         count_marked = 0
 
         for p in new_payments:
@@ -382,6 +407,7 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
 
     last_timestamp = 0
+    print("Last timestamp: ", last_timestamp)
 
     req = breez_sdk_liquid.ListPaymentsRequest(
         [breez_sdk_liquid.PaymentType.RECEIVE],

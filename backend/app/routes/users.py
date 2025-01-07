@@ -51,7 +51,7 @@ def list_users(db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=UserOut)
-def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.twitter_username == user_data.twitter_username).first()
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")

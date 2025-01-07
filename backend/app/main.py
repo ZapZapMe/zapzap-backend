@@ -2,6 +2,8 @@
 import logging
 import time
 
+import breez_sdk_liquid
+from breez_sdk_liquid import LogEntry, Logger
 from config import settings
 from db import (
     Base,
@@ -44,9 +46,27 @@ app.add_middleware(
 )
 
 
+# class SdkLogger(Logger):
+#     def log(self, log_entry: LogEntry):
+#         log_level = log_entry.level
+#         log_line = log_entry.line
+
+#         print(f"[SDK {log_level} and {log_line}]")
+
+
+# def initialize_logger():
+#     try:
+#         breez_sdk_liquid.set_logger(SdkLogger())
+#         print("Breez SDK Logger initiated.")
+#     except Exception as e:
+#         print("Failed to initialize logger", e)
+#         raise
+
+
 @app.on_event("startup")
 def startup_event():
     connect_breez(restore_only=True)
+    # initialize_logger()
 
     listener_id = add_liquid_event_listener()
     logging.info(f"[startup_event] Nodeless event listener added, ID: {listener_id}")
