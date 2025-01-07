@@ -1,7 +1,7 @@
 [project]
 name = "zapzap"
 description = "ZapZap Backend"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 
 [tool.ruff]
 line-length = 120
