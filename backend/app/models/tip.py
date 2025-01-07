@@ -1,10 +1,16 @@
-from sqlalchemy.orm import relationship
-from sqlalchemy import ForeignKey, Column, Integer
+from datetime import datetime
+
 from db import Base
-from datetime import datetime
-from sqlalchemy.orm import relationship, mapped_column, Mapped
 from models.user import User
-from datetime import datetime
+from sqlalchemy import (
+    ForeignKey,
+)
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
+)
+
 
 class Tip(Base):
     __tablename__ = "tip"
@@ -21,7 +27,7 @@ class Tip(Base):
     paid_in: Mapped[bool] = mapped_column(default=False)
     paid_out: Mapped[bool] = mapped_column(default=False)
     forward_payment_hash: Mapped[str] = mapped_column(nullable=True, index=True)
-    
+
     created_at: Mapped[datetime] = mapped_column(default=datetime.now)
 
     tipper_user: Mapped["User"] = relationship(back_populates="sent_tips")

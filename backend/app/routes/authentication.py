@@ -1,14 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse
-from authlib.integrations.starlette_client import OAuth
-from starlette.requests import Request
-from sqlalchemy.orm import Session
-from db import get_db
-import os
-from models.user import User
-from utils.security import create_access_token
 import logging
-from datetime import timedelta
+import os
+
+from authlib.integrations.starlette_client import OAuth
+from db import get_db
+from fastapi import Depends, HTTPException
+from models.user import User
+from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 # OAuth configuration
 oauth = OAuth()
@@ -21,6 +19,7 @@ twitter = oauth.register(
     access_token_url="https://api.twitter.com/oauth/access_token",
     client_kwargs={"token_placement": "header"},
 )
+
 
 @app.get("/")
 async def home():
@@ -35,13 +34,13 @@ async def login(request: Request):
 
 
 @app.get("/auth/callback")
-async def auth_callback(request: Request, db : Session = Depends(get_db)):
+async def auth_callback(request: Request, db: Session = Depends(get_db)):
     # Handle callback and fetch user info
     try:
         token = await twitter.authorize_access_token(request)
         user_info = await twitter.get("account/verify_credentials.json", token=token)
         profile = user_info.json()
-        twitter_username  = profile.get("screen")
+        twitter_username = profile.get("screen")
         # twitter_user_id = profile.get("id_str")
         if not twitter_username or twitter_user_id:
             raise HTTPException(status_code=400, detail="Failed to retrieve twitter username or ID")
@@ -49,7 +48,7 @@ async def auth_callback(request: Request, db : Session = Depends(get_db)):
         user = db.query(User).filter(User.twitter_username == twitter_username).first()
         if not user:
             user = User(
-                twitter_username = twitter_username,
+                twitter_username=twitter_username,
                 # twitter_user_id = twitter_user_id
             )
             db.add(user)
@@ -59,10 +58,8 @@ async def auth_callback(request: Request, db : Session = Depends(get_db)):
         else:
             logging.info(f"Retrieved existing user: @{twitter_username}")
 
-        access_token_expires = timedelta(seconds=)
+        # access_token_expires = timedelta(seconds= )
 
-    
-        
         # return {
         #     "username": profile.get("screen_name"),
         #     "user_id": profile.get("id_str"),

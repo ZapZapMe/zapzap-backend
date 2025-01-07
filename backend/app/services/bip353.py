@@ -1,5 +1,6 @@
-import dns.resolver
 import urllib.parse
+
+import dns.resolver
 import requests
 
 # we store the payout address as user@domain in the database
@@ -24,10 +25,7 @@ def resolve_recipient_via_bip353(user_domain):
         answers = dns.resolver.resolve(txt_query, "TXT")
 
         # Join all TXT record strings together (255 character max)
-        bip21_uri = "".join(
-            ["".join(r.decode("utf-8") for r in record.strings)
-             for record in answers]
-        )
+        bip21_uri = "".join(["".join(r.decode("utf-8") for r in record.strings) for record in answers])
 
         # bitcoin:?lno=lno1XXXXXXXX
         parsed_bip21 = parse_bip21(bip21_uri)
@@ -103,18 +101,13 @@ def resolve_payout_method(user_domain):
     if lnurl_address:
         print(f"Resolved LNURL address for {user_domain}: {lnurl_address}")
         return user_domain
-    
+
     print(f"Failed to resolve payout method for {user_domain}")
     return None
 
 
 # Example usage
 if __name__ == "__main__":
-
-    input_list = [
-        "simon@imaginator.com",
-        "imaginator@strike.me",
-        "invalid@example.com"
-    ]
+    input_list = ["simon@imaginator.com", "imaginator@strike.me", "invalid@example.com"]
     for user in input_list:
         result = resolve_payout_method(user)

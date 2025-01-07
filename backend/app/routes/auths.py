@@ -1,19 +1,20 @@
+import logging
 from contextvars import Token
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from fastapi.responses import RedirectResponse
-from db import get_db
-from config import settings
-from models.user import User
 from datetime import timedelta
+
+from config import settings
+from db import get_db
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
+from models.user import User
 from schemas.auth import Token
+from sqlalchemy.orm import Session
+from utils.security import create_access_token
 from utils.twitter_oauth import (
+    exchange_code_for_token,
     get_authorization_url,
     get_twitter_user_info,
-    exchange_code_for_token,
 )
-import logging
-from utils.security import create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -52,18 +53,14 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
 
     user = db.query(User).filter(User.twitter_username == twitter_username).first()
 
-
     if not user:
         user = User(twitter_username=twitter_username)
         db.add(user)
         db.commit()
         db.refresh(user)  # Refresh the user object to reflect committed changes
 
-
     access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)
-    token = create_access_token(
-        data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires
-    )
+    token = create_access_token(data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires)
     frontend_url = "http://localhost:5000/"
     # or for local dev:
     # frontend_url = "http://localhost:3000"

@@ -1,7 +1,12 @@
-from db import Base
 from datetime import datetime
-from sqlalchemy.orm import relationship, mapped_column, Mapped
 from typing import List
+
+from db import Base
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
+)
 
 
 class User(Base):
@@ -12,6 +17,5 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     wallet_address: Mapped[str] = mapped_column(nullable=True, index=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
-
 
     sent_tips: Mapped[List["Tip"]] = relationship(back_populates="tipper_user")

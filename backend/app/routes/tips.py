@@ -5,12 +5,15 @@ from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.tip import Tip
 from models.user import User
-from schemas.tip import (LeaderboardReceived, LeaderboardSent, TipCreate,
-                         TipOut, TipUpdate)
+from schemas.tip import (
+    LeaderboardReceived,
+    LeaderboardSent,
+    TipCreate,
+    TipOut,
+)
 from services.lightning_service import create_invoice
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
-from utils.security import get_current_user
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
@@ -21,27 +24,28 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
     last_24_hours = datetime.utcnow() - timedelta(hours=24)
 
     # Query the database for tips marked as paid_in=True and created within the last 24 hours
-    tips = db.query(
-        Tip.recipient_twitter_username,
-        func.sum(Tip.amount_sats).label("total_amount_sats"),
-        func.count(Tip.id).label("tip_count")
-    ).filter(
-        Tip.paid_in == True,
-        Tip.created_at >= last_24_hours
-    ).group_by(
-        Tip.recipient_twitter_username
-    ).order_by(
-        desc("total_amount_sats")
-    ).limit(10).all()
+    tips = (
+        db.query(
+            Tip.recipient_twitter_username,
+            func.sum(Tip.amount_sats).label("total_amount_sats"),
+            func.count(Tip.id).label("tip_count"),
+        )
+        .filter(Tip.paid_in == True, Tip.created_at >= last_24_hours)
+        .group_by(Tip.recipient_twitter_username)
+        .order_by(desc("total_amount_sats"))
+        .limit(10)
+        .all()
+    )
 
     # Convert the query result to a list of UserTipSummary
     result = [
         LeaderboardReceived(
             recipient_twitter_username=tip.recipient_twitter_username,
             total_amount_sats=tip.total_amount_sats,
-            tip_count=tip.tip_count
+            tip_count=tip.tip_count,
         )
-        for tip in tips]
+        for tip in tips
+    ]
 
     return result
 
@@ -52,27 +56,28 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
     last_24_hours = datetime.utcnow() - timedelta(hours=24)
 
     # Query the database for tips created within the last 24 hours
-    tips = db.query(
-        Tip.tipper_display_name,
-        func.sum(Tip.amount_sats).label("total_amount_sats"),
-        func.count(Tip.id).label("tip_count")
-    ).filter(
-        Tip.paid_in == True,
-        Tip.created_at >= last_24_hours
-    ).group_by(
-        Tip.tipper_display_name
-    ).order_by(
-        desc("total_amount_sats")
-    ).limit(10).all()
+    tips = (
+        db.query(
+            Tip.tipper_display_name,
+            func.sum(Tip.amount_sats).label("total_amount_sats"),
+            func.count(Tip.id).label("tip_count"),
+        )
+        .filter(Tip.paid_in == True, Tip.created_at >= last_24_hours)
+        .group_by(Tip.tipper_display_name)
+        .order_by(desc("total_amount_sats"))
+        .limit(10)
+        .all()
+    )
 
     # Convert the query result to a list of LeaderboardSent
     result = [
         LeaderboardSent(
             tipper_display_name=tip.tipper_display_name,
             total_amount_sats=tip.total_amount_sats,
-            tip_count=tip.tip_count
+            tip_count=tip.tip_count,
         )
-        for tip in tips]
+        for tip in tips
+    ]
 
     return result
 
@@ -84,21 +89,26 @@ def create_tip(
     # current_user: User = Depends(get_current_user),
 ):
     try:
-        receiver = db.query(User).filter(
-            User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
-            
+        receiver = (
+            db.query(User).filter(User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
+        )
+
         if receiver:
             if not receiver.wallet_address:
-                logging.warning(f"Receiver {receiver.recipient_twitter_username} does not have a bolt12 address. Tip will be held.")
+                logging.warning(
+                    f"Receiver {receiver.recipient_twitter_username} does not have a bolt12 address. Tip will be held."
+                )
 
         else:
-            logging.warning(f"Receiver {tip_data.recipient_twitter_username} not found. Tip will be held until user registers.")
+            logging.warning(
+                f"Receiver {tip_data.recipient_twitter_username} not found. Tip will be held until user registers."
+            )
 
         bolt11, payment_hash, tip_fee = create_invoice(
             tip_data.tweet_url,
             tip_data.amount_sats,
             f"Tip from anonymous - {tip_data.comment}",
-            )
+        )
 
         new_tip = Tip(
             tipper_display_name=tip_data.tipper_display_name or "anonymous",
@@ -124,9 +134,8 @@ def create_tip(
         raise
     except Exception as e:
         logging.error(f"Unexpected error occurred: {e}")
-        raise HTTPException(
-            status_code=400, detail=f"Failed to create tip. Reason: {str(e)}")
-    
+        raise HTTPException(status_code=400, detail=f"Failed to create tip. Reason: {str(e)}")
+
 
 @router.get("/", response_model=list[TipOut])
 def list_tips(db: Session = Depends(get_db)):

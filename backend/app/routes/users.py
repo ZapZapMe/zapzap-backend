@@ -1,25 +1,33 @@
-from models.user import User
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from db import get_db
 import logging
-from schemas.user import UserCreate, UserOut, UserUpdate
-from utils.security import get_current_user
+
+from db import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from models.user import User
+from schemas.user import (
+    UserCreate,
+    UserOut,
+    UserUpdate,
+)
 from services.lightning_service import forward_payment_to_receiver
-from services.bip353 import resolve_payout_method
+from sqlalchemy.orm import Session
+from utils.security import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
+
 
 @router.get("/me", response_model=UserOut)
 def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+
 @router.put("/me", response_model=UserOut)
-def update_user_profile(user_update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_user_profile(
+    user_update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     user = db.query(User).filter(User.id == current_user.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found!")
-    
+
     updated = False
     if user_update.wallet_address and user.wallet_address != user_update.wallet_address:
         user.wallet_address = user_update.wallet_address
@@ -29,15 +37,18 @@ def update_user_profile(user_update: UserUpdate, db: Session = Depends(get_db), 
     db.refresh(user)
 
     if updated:
-        logging.info(f"User @{user.twitter_username} updated their wallet address. Initiating forwarding of pending tips.")
+        logging.info(
+            f"User @{user.twitter_username} updated their wallet address. Initiating forwarding of pending tips."
+        )
         forward_payment_to_receiver(user.id)
     return user
+
 
 @router.get("/", response_model=list[UserOut])
 def list_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
     return users
-    
+
 
 @router.post("/", response_model=UserOut)
 def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -50,4 +61,3 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db), current_us
     db.commit()
     db.refresh(new_user)
     return new_user
-

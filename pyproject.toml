@@ -1,3 +1,8 @@
+[project]
+name = "zapzap"
+description = "ZapZap Backend"
+requires-python = ">=3.10"
+
 [tool.ruff]
 line-length = 120
 
@@ -9,4 +14,4 @@ line-ending = "auto"
 [tool.ruff.lint]
 
 [tool.Ruff.lint.isort]
-multi_line_output = 3
+force-wrap-aliases = true

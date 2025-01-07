@@ -1,5 +1,8 @@
 from db import Base
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+)
 
 
 class SyncState(Base):
