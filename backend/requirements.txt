@@ -1,7 +1,7 @@
 alembic
 authlib
 bolt11
-breez_sdk_liquid
+breez_sdk
 cloud-sql-python-connector[pg8000]
 databases
 fastapi

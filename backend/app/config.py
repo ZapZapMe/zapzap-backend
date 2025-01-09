@@ -26,7 +26,8 @@ class Settings:
 
     BREEZ_API_KEY = os.getenv("BREEZ_API_KEY")
     BREEZ_MNEMONIC = os.getenv("BREEZ_MNEMONIC")
-    BREEZ_DATA_PATH = os.getenv("BREEZ_DATA_PATH", "/breez_data")
+    BREEZ_DATA_PATH = os.getenv("BREEZ_DATA_PATH", "./")
+    BREEZ_GREENLIGHT_INVITE = os.getenv("BREEZ_GREENLIGHT_INVITE")
 
 
 settings = Settings()

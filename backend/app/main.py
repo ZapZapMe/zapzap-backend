@@ -2,8 +2,8 @@
 import logging
 import time
 
-import breez_sdk_liquid
-from breez_sdk_liquid import LogEntry, Logger
+import breez_sdk
+from breez_sdk import ConnectRequest, EnvironmentType, EventListener, NodeConfig, default_config, mnemonic_to_seed
 from config import settings
 from db import (
     Base,
@@ -18,7 +18,7 @@ from routes import (
     users,
 )
 from services.lightning_service import (
-    add_liquid_event_listener,
+    # add_greenlight_event_listener,
     connect_breez,
     pull_unpaid_invoices_since,
 )
@@ -77,18 +77,21 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    connect_breez(restore_only=True)
+    print("Starting")
+    connect_breez(restore_only=False)
+    print("CONNECTION SUCCESSFUL")
 
     # logging.basicConfig(level=logging.DEBUG)
     # logger = SdkLogger()
     # set_logger(logger)
 
-    listener_id = add_liquid_event_listener()
-    logging.info(f"[startup_event] Nodeless event listener added, ID: {listener_id}")
-    print(f"[startup_event] Nodeless event listener added, ID: {listener_id}")
+    # listener_id = add_greenlight_event_listener()
+    # logging.info(f"[startup_event] Greenlight event listener added, ID: {listener_id}")
+    # print(f"[startup_event] Greenlight event listener added, ID: {listener_id}")
 
     with SessionLocal() as db:
         last_ts = get_last_sync_state(db)
+    print("HELL YEA WE ARE IN!")
 
     pull_unpaid_invoices_since(last_ts)
 
@@ -104,7 +107,7 @@ app.include_router(tips.router)
 
 @app.get("/")
 def root():
-    return {"message": "ZapZap backend is running!"}
+    return {"message": "ZapZap backend is running with Greenlight!"}
 
 
 @app.get("/config-check")

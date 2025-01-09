@@ -1,21 +1,22 @@
 import logging
 from datetime import datetime
 
-import breez_sdk_liquid
-import lnurl
-from breez_sdk_liquid import (
-    BindingLiquidSdk,
+import breez_sdk
+from breez_sdk import (
+    ConnectRequest,
+    EnvironmentType,
     EventListener,
-    InputType,
-    LnUrlPayRequest,
-    PayAmount,
-    PaymentMethod,
-    PrepareLnUrlPayRequest,
-    PrepareReceiveRequest,
-    PrepareSendRequest,
+    ListPaymentsRequest,
+    NodeConfig,
+    Payment,
+    PaymentStatus,
+    PaymentType,
+    PaymentTypeFilter,
     ReceivePaymentRequest,
-    SdkEvent,
     SendPaymentRequest,
+    default_config,
+    mnemonic_to_seed,
+    parse_input,
     parse_invoice,
 )
 from config import settings
@@ -33,46 +34,45 @@ sdk_services = None
 
 
 def send_bolt12_payment(bolt12_offer: str, amount_sats: int):
+    pass
     # ross_bolt12 = "lno1zrxq8pjw7qjlm68mtp7e3yvxee4y5xrgjhhyf2fxhlphpckrvevh50u0qtn2mq3gzvt8mkq4fy7vgt34s3kkdpllgshz3ak3d8st0texhm2hqqszvedh6tvvyt2zyvcl39chzqja08y3zu27f8jjl7mgyyp2kw5da6cqqvc3naftwk24xr90uqhwqv2p2znatq2tgh63ny3vd4slykgcx87ftuh28jwpvygshf34gfc8ywnkxlw89dh2qvmz9da8dw6nx5gty895tllv3t2lzk02l7vzna3m9dnpphjftncwvqqs4zrs72t38qscfe49vnwwmucwhg"
 
-    try:
-        optional_amount = PayAmount.RECEIVER(amount_sats)
-        prepare_req = PrepareSendRequest(destination=bolt12_offer, amount=optional_amount)
-        prepare_res = sdk_services.prepare_send_payment(prepare_req)
-        logging.info(f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_res.fees_sat} sats")
-        send_req = SendPaymentRequest(prepare_res)
-        print("SEND REQUEST", send_req)
-        send_res = sdk_services.send_payment(send_req)
-        print("SEND RESPONSE", send_res)
-        logging.info(f"Payment sent successfully. Payment Hash: {send_res.payment}")
-        return send_res.payment
-    except Exception as e:
-        logging.error(f"Error creating PayAmount: {e}")
-        return None
+    # try:
+    #     optional_amount = PayAmount.RECEIVER(amount_sats)
+    #     prepare_req = PrepareSendRequest(destination=bolt12_offer, amount=optional_amount)
+    #     prepare_res = sdk_services.prepare_send_payment(prepare_req)
+    #     logging.info(f"Prepared to send {amount_sats} to {bolt12_offer}. Estimated fees: {prepare_res.fees_sat} sats")
+    #     send_req = SendPaymentRequest(prepare_res)
+    #     print("SEND REQUEST", send_req)
+    #     send_res = sdk_services.send_payment(send_req)
+    #     print("SEND RESPONSE", send_res)
+    #     logging.info(f"Payment sent successfully. Payment Hash: {send_res.payment}")
+    #     return send_res.payment
+    # except Exception as e:
+    #     logging.error(f"Error creating PayAmount: {e}")
+    #     return None
 
 
 def send_lnurl_payment(lnurl_address: str, amount_sats: int):
     try:
-        parsed_input = breez_sdk_liquid.parse(lnurl_address)
-        if isinstance(parsed_input, InputType.LN_URL_PAY):
+        parsed_input = breez_sdk.parse_input(lnurl_address)
+        if isinstance(parsed_input, breez_sdk.InputType.LN_URL_PAY):
             amount_msat = amount_sats * 1000
-            optional_comment = "test"
-            optional_validate_success_action_url = True
+            use_trampoline = True
+            comment = "test"
 
-            req = PrepareLnUrlPayRequest(
-                parsed_input.data, amount_msat, optional_comment, optional_validate_success_action_url
+            req = breez_sdk.LnUrlPayRequest(
+                ln_url_pay=parsed_input.data,
+                amount_msat=amount_msat,
+                use_trampoline=use_trampoline,
+                comment=comment,
             )
-            prepare_response = sdk_services.prepare_lnurl_pay(req)
-            print("LNURL Response: ", prepare_response)
 
-            # If the fees are acceptable, continue to create the LNURL Pay
-            fees_sat = prepare_response.fees_sat
-            logging.debug("Fees: ", fees_sat, " sats")
-
-            pay_req = LnUrlPayRequest(prepare_response)
-            pay_res = sdk_services.lnurl_pay(pay_req)
-
-            print(f"LNURL payment successful.")
+            pay_res = sdk_services.pay_lnurl(req)
+            logging.info("LNURL Payment successful")
+            return pay_res.payment_hash
+        else:
+            logging.error("Provided input is not LNURL-PAY type.")
     except Exception as error:
         print(f"Issue with LNURL payment: {error}")
         logging.error(error)
@@ -187,45 +187,28 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
             logging.info("[mark_invoice_as_paid_in_db] no match or already paid!")
 
 
-class SdkListener(EventListener):
-    def on_event(sdk_event: SdkEvent):
-        logging.debug("Received event ", sdk_event)
-        print("Received event ", sdk_event)
+class MyGreenlightListener(EventListener):
+    def on_event(self, sdk_event):
+        logging.info(f"[MyGreenlightListener] Received event: {sdk_event}")
+        print(f"[MyGreenlightListener] Received event: {sdk_event}")
+        # if isinstance(sdk_event, breez_sdk.SdkEvent.PAYMENT_WAITING_CONFIRMATION):
+        #     payment = sdk_event.details
+        #     if payment.destination:
+        #         payment_invoice = payment.destination
+        #         mark_invoice_as_paid_in_db(payment_invoice)
+        #         logging.info(f"[MyGreenlightListener] Marked {payment_invoice} as paid in DB")
+        #         print(f"[MyGreenlightListener] Marked {payment_invoice} as paid in DB")
 
 
-def add_event_listener(sdk: BindingLiquidSdk, listener: SdkListener):
-    try:
-        mark_invoice_as_paid_in_db
-        listener_id = sdk.add_event_listener(listener)
-        logging.info(f"Listener successfully added with ID: {listener_id}")
-        return listener_id
-    except Exception as error:
-        logging.error(error)
-        raise
+# def add_greenlight_event_listener():
+#     global sdk_services
+#     if not sdk_services:
+#         raise RuntimeError("Greenlight SDK not connected yet. Call connect_breez() first.")
 
-
-class MyNodelessListener(SdkListener):
-    def on_event(self, sdk_event: SdkEvent):
-        logging.info(f"[MyNodelessListener] Received event: {sdk_event}")
-        print(f"[MyNodelessListener] Received event: {sdk_event}")
-        if isinstance(sdk_event, breez_sdk_liquid.SdkEvent.PAYMENT_WAITING_CONFIRMATION):
-            payment = sdk_event.details
-            if payment.destination:
-                payment_invoice = payment.destination
-                mark_invoice_as_paid_in_db(payment_invoice)
-                logging.info(f"[MyNodelessListener] Marked {payment_invoice} as paid in DB")
-                print(f"[MyNodelessListener] Marked {payment_invoice} as paid in DB")
-
-
-def add_liquid_event_listener():
-    global sdk_services
-    if not sdk_services:
-        raise RuntimeError("Nodeless SDK not connected yet. Call connect_breez() first.")
-
-    listener = MyNodelessListener()
-    listener_id = add_event_listener(sdk_services, listener)
-    logging.info(f"Event listener initialized with ID: {listener_id}")
-    return listener_id
+#     listener = MyGreenlightListener()
+#     listener_id = sdk_services.add_event_listener(sdk_services, listener)
+#     logging.info(f"Event listener initialized with ID: {listener_id}")
+#     return listener_id
 
 
 # def add_event_listener(sdk: BindingLiquidSdk, listener: SDKListener):
@@ -244,6 +227,13 @@ def add_liquid_event_listener():
 #                 mark_invoice_as_paid_in_db(payment.payment_hash)
 
 
+class MyLogStream(breez_sdk.LogStream):
+    def log(self, l):
+        logging.basicConfig(level=logging.DEBUG)
+        if l.level in ("INFO", "DEBUG"):
+            print("Received log [", l.level, "]: ", l.line)
+
+
 def connect_breez(restore_only: bool = False):
     """
     Connects to the Breez node and sets up the Breez services globally.
@@ -252,28 +242,30 @@ def connect_breez(restore_only: bool = False):
     """
 
     global sdk_services
+    # breez_sdk.set_log_stream(MyLogStream())
 
     # For dev, you might use a BIP39 test mnemonic or create your own
     # In production, store your real mnemonic in a safe place (not in code).
     # For now, let's assume you have it in environment:
     # e.g. MNEMONIC="abandon abandon abandon ... rocket manual"
     mnemonic = settings.BREEZ_MNEMONIC
+    seed = mnemonic_to_seed(mnemonic)
+
+    invite_code = settings.BREEZ_GREENLIGHT_INVITE
 
     # Build the Breez config
-    config = breez_sdk_liquid.default_config(
-        breez_api_key=settings.BREEZ_API_KEY,
-        network=breez_sdk_liquid.LiquidNetwork.MAINNET,
+    config = default_config(
+        EnvironmentType.PRODUCTION,
+        settings.BREEZ_API_KEY,
+        NodeConfig.GREENLIGHT(breez_sdk.GreenlightNodeConfig(partner_credentials=None, invite_code=invite_code)),
     )
     config.working_dir = settings.BREEZ_DATA_PATH
-    config.cache_dir = "/tmp/breez_cache_dir"
 
-    # Connect request, specifying restore_only if you already have a node
-    connect_request = breez_sdk_liquid.ConnectRequest(config, mnemonic)
-
-    # This actually connects to the node (hosted on Greenlight).
-    # Once done, Breez will handle LN channels, etc.
     try:
-        sdk_services = breez_sdk_liquid.connect(connect_request)
+        print("I am trying")
+        my_listener = MyGreenlightListener()
+        connect_request = ConnectRequest(config, seed, restore_only=restore_only)
+        sdk_services = breez_sdk.connect(connect_request, my_listener)
         print("Breez Connected Successfully")
         logging.info("Breez SDK connected successfully.")
     except Exception as e:
@@ -369,18 +361,14 @@ def pull_unpaid_invoices_since_broken(last_timestamp: datetime):
     last_timestamp = 0
 
     try:
-        req = breez_sdk_liquid.ListPaymentsRequest(
-            [breez_sdk_liquid.PaymentType.RECEIVE],
-            from_timestamp=last_timestamp,
-            offset=0,
-            limit=50,
-        )
+        req = breez_sdk.ListPaymentsRequest(filters=[breez_sdk.PaymentTypeFilter.RECEIVED], from_timestamp=from_ts)
+        print("REQUEST", req)
         new_payments = sdk_services.list_payments(req)
         print("NEW PAYMENTS", new_payments)
         count_marked = 0
 
         for p in new_payments:
-            if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
+            if p.status == breez_sdk.PaymentState.COMPLETE:
                 bolt11_of_this_payment = p.destination
                 mark_invoice_as_paid_in_db(bolt11_of_this_payment)
                 count_marked += 1
@@ -409,17 +397,15 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
     last_timestamp = 0
     print("Last timestamp: ", last_timestamp)
 
-    req = breez_sdk_liquid.ListPaymentsRequest(
-        [breez_sdk_liquid.PaymentType.RECEIVE],
+    req = breez_sdk.ListPaymentsRequest(
+        breez_sdk.PaymentTypeFilter.RECEIVED,
         from_timestamp=last_timestamp,
-        offset=0,
-        limit=50,
     )
     new_payments = sdk_services.list_payments(req)
     count_marked = 0
 
     for p in new_payments:
-        if p.status == breez_sdk_liquid.PaymentState.COMPLETE:
+        if p.status == breez_sdk.PaymentStatus.COMPLETE:
             bolt11_of_this_payment = p.destination
             mark_invoice_as_paid_in_db(bolt11_of_this_payment)
             count_marked += 1
