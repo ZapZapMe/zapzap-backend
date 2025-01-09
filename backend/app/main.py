@@ -20,7 +20,6 @@ from routes import (
 from services.lightning_service import (
     add_liquid_event_listener,
     connect_breez,
-    create_invoice,
     pull_unpaid_invoices_since,
 )
 from utils.sync_state import (
@@ -47,6 +46,19 @@ app.add_middleware(
 
 
 # class SdkLogger(Logger):
+#     def log(log_entry: LogEntry):
+#         logging.debug("Received log [", log_entry.level, "]: ", log_entry.line)
+
+
+# def set_logger(logger: SdkLogger):
+#     try:
+#         breez_sdk_liquid.set_logger(logger)
+#     except Exception as error:
+#         logging.error(error)
+#         raise
+
+
+# class SdkLogger(Logger):
 #     def log(self, log_entry: LogEntry):
 #         log_level = log_entry.level
 #         log_line = log_entry.line
@@ -66,7 +78,10 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     connect_breez(restore_only=True)
-    # initialize_logger()
+
+    # logging.basicConfig(level=logging.DEBUG)
+    # logger = SdkLogger()
+    # set_logger(logger)
 
     listener_id = add_liquid_event_listener()
     logging.info(f"[startup_event] Nodeless event listener added, ID: {listener_id}")
@@ -98,15 +113,3 @@ def config_check():
         "env": settings.ENVIRONMENT,
         "greet": settings.GREETING,
     }
-
-
-@app.get("/lightning/test-invoice")
-def test_invoice():
-    amount = 1100
-    invoice, temp, temp1 = create_invoice(amount, "Test invoice")
-    return {"invoice": invoice}
-
-
-# @app.get("/lightning/test-balance")
-# def test_balance():
-#     return get_balance()

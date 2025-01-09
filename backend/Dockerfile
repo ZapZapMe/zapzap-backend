@@ -16,4 +16,3 @@ EXPOSE 8080
 
 # Set the command to run the application when the container starts
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1" ]
-# web: gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app

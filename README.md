@@ -15,8 +15,9 @@ You will need to setup a local proxy to the production database. Install https:/
 ## Running Locally (Docker)
 
 ```bash
+source .env
 docker build -t zapzap-backend -f Dockerfile
-docker run zapzap-backend
+docker run -p 8080:8080 --env ENVIRONMENT=development --env BREEZ_API_KEY=$BREEZ_API_KEY --env BREEZ_MNEMONIC=$BREEZ_MNEMONIC  --env BREEZ_DATA_PATH=./  zapzap-backend
 ```
 
 ## Pushing Builds
@@ -24,11 +25,6 @@ docker run zapzap-backend
 ```bash
 gcloud auth configure-docker europe-west1-docker.pkg.dev
 docker build -t zapzap-backend -f Dockerfile --platform linux/x86_64 .
-
-docker tag zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:latest
-docker push europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:latest
-
-
 docker push zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
 gcloud run deploy cloudrun-service  --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
 ```

@@ -12,9 +12,9 @@ class Settings:
     LOCAL_DATABASE_URL = os.getenv("LOCAL_DATABASE_URL", "sqlite:///./test.db")
 
     # postgres_database
-    db_user = os.environ["DB_USER"]
-    db_pass = os.environ["DB_PASS"]
-    db_name = os.environ["DB_NAME"]
+    db_user = os.getenv("DB_USER")
+    db_pass = os.getenv("DB_PASS")
+    db_name = os.getenv("DB_NAME")
 
     TWITTER_CLIENT_ID = os.getenv("TWITTER_CLIENT_ID")
     TWITTER_CLIENT_SECRET = os.getenv("TWITTER_CLIENT_SECRET")
@@ -26,7 +26,7 @@ class Settings:
 
     BREEZ_API_KEY = os.getenv("BREEZ_API_KEY")
     BREEZ_MNEMONIC = os.getenv("BREEZ_MNEMONIC")
-    BREEZ_DATA_PATH = os.getenv("BREEZ_DATA_PATH", "/tmp/breez_data")
+    BREEZ_DATA_PATH = os.getenv("BREEZ_DATA_PATH", "/breez_data")
 
 
 settings = Settings()

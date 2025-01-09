@@ -4,6 +4,7 @@ import os
 from authlib.integrations.starlette_client import OAuth
 from db import get_db
 from fastapi import Depends, HTTPException
+from main import app
 from models.user import User
 from sqlalchemy.orm import Session
 from starlette.requests import Request
@@ -41,8 +42,7 @@ async def auth_callback(request: Request, db: Session = Depends(get_db)):
         user_info = await twitter.get("account/verify_credentials.json", token=token)
         profile = user_info.json()
         twitter_username = profile.get("screen")
-        # twitter_user_id = profile.get("id_str")
-        if not twitter_username or twitter_user_id:
+        if not twitter_username:
             raise HTTPException(status_code=400, detail="Failed to retrieve twitter username or ID")
 
         user = db.query(User).filter(User.twitter_username == twitter_username).first()
