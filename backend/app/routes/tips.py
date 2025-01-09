@@ -20,8 +20,7 @@ router = APIRouter(prefix="/tips", tags=["tips"])
 
 @router.get("/leaderboard_received", response_model=list[LeaderboardReceived])
 def get_most_tipped_users(db: Session = Depends(get_db)):
-    # Calculate the timestamp for 24 hours ago
-    last_24_hours = datetime.utcnow() - timedelta(hours=24)
+    timerange = datetime.utcnow() - timedelta(days=30)
 
     # Query the database for tips marked as paid_in=True and created within the last 24 hours
     tips = (
@@ -30,7 +29,7 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
             func.sum(Tip.amount_sats).label("total_amount_sats"),
             func.count(Tip.id).label("tip_count"),
         )
-        .filter(Tip.paid_in == True, Tip.created_at >= last_24_hours)
+        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange)
         .group_by(Tip.recipient_twitter_username)
         .order_by(desc("total_amount_sats"))
         .limit(10)
@@ -52,8 +51,7 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
 
 @router.get("/leaderboard_sent", response_model=list[LeaderboardSent])
 def get_most_active_tippers(db: Session = Depends(get_db)):
-    # Calculate the timestamp for 24 hours ago
-    last_24_hours = datetime.utcnow() - timedelta(hours=24)
+    timerange = datetime.utcnow() - timedelta(days=30)
 
     # Query the database for tips created within the last 24 hours
     tips = (
@@ -62,7 +60,7 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
             func.sum(Tip.amount_sats).label("total_amount_sats"),
             func.count(Tip.id).label("tip_count"),
         )
-        .filter(Tip.paid_in == True, Tip.created_at >= last_24_hours)
+        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange)
         .group_by(Tip.tipper_display_name)
         .order_by(desc("total_amount_sats"))
         .limit(10)
