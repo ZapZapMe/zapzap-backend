@@ -124,6 +124,7 @@ def create_tip(
         db.add(new_tip)
         db.commit()
         db.refresh(new_tip)
+        print("Created NEW TIP!")
 
         return new_tip
 

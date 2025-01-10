@@ -49,6 +49,8 @@ env.bak/
 venv.bak/
 
 backend/app/test.db
+backend/app/storage.sql
+backend/app/sync_storage.sql
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

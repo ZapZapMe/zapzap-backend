@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
-
+import threading
+import lnurl
 import breez_sdk
 from breez_sdk import (
     ConnectRequest,
@@ -62,7 +63,7 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
             comment = "test"
 
             req = breez_sdk.LnUrlPayRequest(
-                ln_url_pay=parsed_input.data,
+                data=parsed_input.data,
                 amount_msat=amount_msat,
                 use_trampoline=use_trampoline,
                 comment=comment,
@@ -70,7 +71,8 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
 
             pay_res = sdk_services.pay_lnurl(req)
             logging.info("LNURL Payment successful")
-            return pay_res.payment_hash
+            print("PAYRES", pay_res)
+            return pay_res
         else:
             logging.error("Provided input is not LNURL-PAY type.")
     except Exception as error:
@@ -97,13 +99,8 @@ def forward_payment_to_receiver(tip_id: int):
         address_str = receiver.wallet_address
         logging.info(f"Forwarding {tip.amount_sats} sats to @{tip.recipient_twitter_username} at address {address_str}")
 
-        bolt12_offer = resolve_recipient_via_bip353(address_str)
-        if bolt12_offer:
-            logging.info(f"[BIP353] Resolved BOLT12 offer: {bolt12_offer}")
-            payment_hash = send_bolt12_payment(bolt12_offer, tip.amount_sats)
-        else:
-            logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
-            payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
+        logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
+        payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
 
         if payment_hash:
             tip.forward_payment_hash = payment_hash
@@ -164,7 +161,7 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
         if not tip:
             return
 
-        if tip and not tip.paid_in:
+        if not tip.paid_in:
             tip.paid_in = True
             db.commit()
             logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
@@ -191,13 +188,28 @@ class MyGreenlightListener(EventListener):
     def on_event(self, sdk_event):
         logging.info(f"[MyGreenlightListener] Received event: {sdk_event}")
         print(f"[MyGreenlightListener] Received event: {sdk_event}")
-        # if isinstance(sdk_event, breez_sdk.SdkEvent.PAYMENT_WAITING_CONFIRMATION):
-        #     payment = sdk_event.details
-        #     if payment.destination:
-        #         payment_invoice = payment.destination
-        #         mark_invoice_as_paid_in_db(payment_invoice)
-        #         logging.info(f"[MyGreenlightListener] Marked {payment_invoice} as paid in DB")
-        #         print(f"[MyGreenlightListener] Marked {payment_invoice} as paid in DB")
+        if isinstance(sdk_event, breez_sdk.BreezEvent.INVOICE_PAID):
+            payment_hash = sdk_event.details.payment_hash
+            logging.info(f"[MyGreenlightListener] Payment received, hash={payment_hash}")
+
+            with SessionLocal() as db:
+                tip = db.query(Tip).filter(Tip.ln_payment_hash == payment_hash).first()
+                if not tip:
+                    logging.warning(f"[MyGreenlightListener] Tip not found for hash={payment_hash}")
+                    return
+
+                if not tip.paid_in:
+                    tip.paid_in = True
+                    db.commit()
+                    logging.info(f"[MyGreenlightListener] Marked tip #{tip.id} as paid_in.")
+                else:
+                    logging.info(f"[MyGreenlightListener] Tip #{tip.id} was already paid_in.")
+
+                # Now spawn a separate thread for LNURL pay
+                t = threading.Thread(target=forward_payment_to_receiver, args=(tip.id,))
+                t.start()
+                logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id} in LNURL.")
+
 
 
 # def add_greenlight_event_listener():
@@ -230,11 +242,11 @@ class MyGreenlightListener(EventListener):
 class MyLogStream(breez_sdk.LogStream):
     def log(self, l):
         logging.basicConfig(level=logging.DEBUG)
-        if l.level in ("INFO", "DEBUG"):
+        if l.level in ("ERROR"):
             print("Received log [", l.level, "]: ", l.line)
 
 
-def connect_breez(restore_only: bool = False):
+def connect_breez(restore_only: bool = True):
     """
     Connects to the Breez node and sets up the Breez services globally.
     - If this is your first time, set restore_only=False to create a new node.
@@ -242,7 +254,7 @@ def connect_breez(restore_only: bool = False):
     """
 
     global sdk_services
-    # breez_sdk.set_log_stream(MyLogStream())
+    breez_sdk.set_log_stream(MyLogStream())
 
     # For dev, you might use a BIP39 test mnemonic or create your own
     # In production, store your real mnemonic in a safe place (not in code).
@@ -267,6 +279,15 @@ def connect_breez(restore_only: bool = False):
         connect_request = ConnectRequest(config, seed, restore_only=restore_only)
         sdk_services = breez_sdk.connect(connect_request, my_listener)
         print("Breez Connected Successfully")
+        info = sdk_services.node_info()
+        print("Channels balance:", info.channels_balance_msat)
+        print("On-chain balance:", info.onchain_balance_msat)
+        lsp_id = sdk_services.lsp_id()
+        lsp_info = sdk_services.lsp_info()
+        print("LSP ID:", lsp_id)
+        print("LSP Info:", lsp_info)
+
+
         logging.info("Breez SDK connected successfully.")
     except Exception as e:
         logging.error(f"Error connecting to Breez: {e}")
@@ -311,31 +332,19 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
 
-    prepare_req = PrepareReceiveRequest(payment_method=PaymentMethod.LIGHTNING, payer_amount_sat=amount_sats)
+    req = breez_sdk.ReceivePaymentRequest(amount_sats*1000, description=description)
 
-    prepare_resp = sdk_services.prepare_receive_payment(prepare_req)
+    res = sdk_services.receive_payment(req)
+    
+    try:
+        bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
+        payment_hash = res.ln_invoice.payment_hash  # Access the payment_hash attribute
+    except AttributeError as e:
+        print(f"Error accessing response attributes: {e}")
+        raise RuntimeError("Failed to parse response from receive_payment")
 
-    invoice_fee = prepare_resp.fees_sat
-
-    logging.info(f"[create invoice] LN fees estimated: {invoice_fee} sats")
-
-    receive_req = ReceivePaymentRequest(
-        prepare_response=prepare_resp,
-        description=f"ZapZap for {tweet_url}",
-        use_description_hash=False,
-    )
-
-    receive_res = sdk_services.receive_payment(receive_req)
-
-    bolt11_invoice = receive_res.destination
-    parse_req = parse_invoice(bolt11_invoice)
-    payment_hash = parse_req.payment_hash
-
-    # amount_msat = amount_sats * 1000
-    # request = breez_sdk_liquid.ReceivePaymentRequest(amount_msat, description)
-    # response = sdk_services.receive_payment(request)
-    # response.ln_invoice is the BOLT11 invoice
-    return (bolt11_invoice, payment_hash, invoice_fee)
+    # Return the invoice and payment hash
+    return bolt11_invoice, payment_hash, 0
 
 
 # try:
@@ -351,30 +360,6 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
 #     logging.error(error)
 #     raise
 
-
-def pull_unpaid_invoices_since_broken(last_timestamp: datetime):
-    """
-    Lists all payments (both sent and received).
-    """
-    if not sdk_services:
-        raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
-    last_timestamp = 0
-
-    try:
-        req = breez_sdk.ListPaymentsRequest(filters=[breez_sdk.PaymentTypeFilter.RECEIVED], from_timestamp=from_ts)
-        print("REQUEST", req)
-        new_payments = sdk_services.list_payments(req)
-        print("NEW PAYMENTS", new_payments)
-        count_marked = 0
-
-        for p in new_payments:
-            if p.status == breez_sdk.PaymentState.COMPLETE:
-                bolt11_of_this_payment = p.destination
-                mark_invoice_as_paid_in_db(bolt11_of_this_payment)
-                count_marked += 1
-        logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
-    except Exception as e:
-        logging.error(f"Error listing payments: {e}")
 
 
 def extract_payment_hash(invoice: str) -> str:
@@ -398,15 +383,16 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
     print("Last timestamp: ", last_timestamp)
 
     req = breez_sdk.ListPaymentsRequest(
-        breez_sdk.PaymentTypeFilter.RECEIVED,
+        filters=[breez_sdk.PaymentTypeFilter.SENT],
         from_timestamp=last_timestamp,
     )
     new_payments = sdk_services.list_payments(req)
+    print("New payments: ", new_payments)
     count_marked = 0
 
     for p in new_payments:
         if p.status == breez_sdk.PaymentStatus.COMPLETE:
-            bolt11_of_this_payment = p.destination
+            bolt11_of_this_payment = p.description
             mark_invoice_as_paid_in_db(bolt11_of_this_payment)
             count_marked += 1
     logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")

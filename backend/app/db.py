@@ -15,7 +15,9 @@ Base = declarative_base()
 def get_engine() -> sqlalchemy.engine.base.Engine:
     if settings.ENVIRONMENT == "development":
         engine = sqlalchemy.create_engine(settings.LOCAL_DATABASE_URL)
+        print("Local DB")
     else:
+        print("Cloud DB")
         connector = Connector()
 
         def getconn() -> pg8000.dbapi.Connection:
