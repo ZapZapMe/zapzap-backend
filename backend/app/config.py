@@ -24,10 +24,10 @@ class Settings:
     JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_ACCESS_TOKEN_EXPIRE_SECONDS = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_SECONDS", 3600))
 
-    BREEZ_API_KEY = os.getenv("BREEZ_API_KEY")
-    BREEZ_MNEMONIC = os.getenv("BREEZ_MNEMONIC")
-    BREEZ_DATA_PATH = os.getenv("BREEZ_DATA_PATH", "./")
-    BREEZ_GREENLIGHT_INVITE = os.getenv("BREEZ_GREENLIGHT_INVITE")
+    BREEZ_API_KEY = os.environ.get("BREEZ_API_KEY")
+    BREEZ_MNEMONIC = os.environ.get("BREEZ_MNEMONIC")
+    BREEZ_DATA_PATH = os.environ.get("BREEZ_DATA_PATH", "./")
+    BREEZ_GREENLIGHT_INVITE = os.environ.get("BREEZ_GREENLIGHT_INVITE")
 
 
 settings = Settings()
