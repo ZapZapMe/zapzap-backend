@@ -78,7 +78,7 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     print("Starting")
-    connect_breez(restore_only=False)
+    connect_breez(restore_only=True)
     print("CONNECTION SUCCESSFUL")
 
     # logging.basicConfig(level=logging.DEBUG)
@@ -91,7 +91,6 @@ def startup_event():
 
     with SessionLocal() as db:
         last_ts = get_last_sync_state(db)
-    print("HELL YEA WE ARE IN!")
 
     pull_unpaid_invoices_since(last_ts)
 

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import threading
 import lnurl
 import breez_sdk
 from breez_sdk import (
@@ -62,7 +63,7 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
             comment = "test"
 
             req = breez_sdk.LnUrlPayRequest(
-                ln_url_pay=parsed_input.data,
+                data=parsed_input.data,
                 amount_msat=amount_msat,
                 use_trampoline=use_trampoline,
                 comment=comment,
@@ -70,7 +71,8 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
 
             pay_res = sdk_services.pay_lnurl(req)
             logging.info("LNURL Payment successful")
-            return pay_res.payment_hash
+            print("PAYRES", pay_res)
+            return pay_res
         else:
             logging.error("Provided input is not LNURL-PAY type.")
     except Exception as error:
@@ -97,13 +99,8 @@ def forward_payment_to_receiver(tip_id: int):
         address_str = receiver.wallet_address
         logging.info(f"Forwarding {tip.amount_sats} sats to @{tip.recipient_twitter_username} at address {address_str}")
 
-        bolt12_offer = resolve_recipient_via_bip353(address_str)
-        if bolt12_offer:
-            logging.info(f"[BIP353] Resolved BOLT12 offer: {bolt12_offer}")
-            payment_hash = send_bolt12_payment(bolt12_offer, tip.amount_sats)
-        else:
-            logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
-            payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
+        logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
+        payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
 
         if payment_hash:
             tip.forward_payment_hash = payment_hash
@@ -164,7 +161,7 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
         if not tip:
             return
 
-        if tip and not tip.paid_in:
+        if not tip.paid_in:
             tip.paid_in = True
             db.commit()
             logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
@@ -191,13 +188,28 @@ class MyGreenlightListener(EventListener):
     def on_event(self, sdk_event):
         logging.info(f"[MyGreenlightListener] Received event: {sdk_event}")
         print(f"[MyGreenlightListener] Received event: {sdk_event}")
-        # if isinstance(sdk_event, breez_sdk.SdkEvent.PAYMENT_WAITING_CONFIRMATION):
-        #     payment = sdk_event.details
-        #     if payment.destination:
-        #         payment_invoice = payment.destination
-        #         mark_invoice_as_paid_in_db(payment_invoice)
-        #         logging.info(f"[MyGreenlightListener] Marked {payment_invoice} as paid in DB")
-        #         print(f"[MyGreenlightListener] Marked {payment_invoice} as paid in DB")
+        if isinstance(sdk_event, breez_sdk.BreezEvent.INVOICE_PAID):
+            payment_hash = sdk_event.details.payment_hash
+            logging.info(f"[MyGreenlightListener] Payment received, hash={payment_hash}")
+
+            with SessionLocal() as db:
+                tip = db.query(Tip).filter(Tip.ln_payment_hash == payment_hash).first()
+                if not tip:
+                    logging.warning(f"[MyGreenlightListener] Tip not found for hash={payment_hash}")
+                    return
+
+                if not tip.paid_in:
+                    tip.paid_in = True
+                    db.commit()
+                    logging.info(f"[MyGreenlightListener] Marked tip #{tip.id} as paid_in.")
+                else:
+                    logging.info(f"[MyGreenlightListener] Tip #{tip.id} was already paid_in.")
+
+                # Now spawn a separate thread for LNURL pay
+                t = threading.Thread(target=forward_payment_to_receiver, args=(tip.id,))
+                t.start()
+                logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id} in LNURL.")
+
 
 
 # def add_greenlight_event_listener():
@@ -234,7 +246,7 @@ class MyLogStream(breez_sdk.LogStream):
             print("Received log [", l.level, "]: ", l.line)
 
 
-def connect_breez(restore_only: bool = False):
+def connect_breez(restore_only: bool = True):
     """
     Connects to the Breez node and sets up the Breez services globally.
     - If this is your first time, set restore_only=False to create a new node.
@@ -323,7 +335,6 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
     req = breez_sdk.ReceivePaymentRequest(amount_sats*1000, description=description)
 
     res = sdk_services.receive_payment(req)
-    print("RES", res)
     
     try:
         bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
@@ -381,7 +392,7 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
 
     for p in new_payments:
         if p.status == breez_sdk.PaymentStatus.COMPLETE:
-            bolt11_of_this_payment = p.destination
+            bolt11_of_this_payment = p.description
             mark_invoice_as_paid_in_db(bolt11_of_this_payment)
             count_marked += 1
     logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
