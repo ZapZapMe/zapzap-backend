@@ -73,7 +73,9 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
             pay_res = sdk_services.pay_lnurl(req)
             logging.info("LNURL Payment successful")
             print("PAYRES", pay_res)
-            return pay_res.data.payment.payment_hash
+            payment_hash = pay_res.data.payment.details.data.payment_hash
+            return payment_hash
+            # return pay_res.data.payment.payment_hash
         else:
             logging.error("Provided input is not LNURL-PAY type.")
     except Exception as error:
