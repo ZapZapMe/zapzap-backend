@@ -1,8 +1,9 @@
 import logging
-from datetime import datetime
 import threading
-import lnurl
+from datetime import datetime
+
 import breez_sdk
+import lnurl
 from breez_sdk import (
     ConnectRequest,
     EnvironmentType,
@@ -72,7 +73,7 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
             pay_res = sdk_services.pay_lnurl(req)
             logging.info("LNURL Payment successful")
             print("PAYRES", pay_res)
-            return pay_res
+            return pay_res.data.payment.payment_hash
         else:
             logging.error("Provided input is not LNURL-PAY type.")
     except Exception as error:
@@ -211,7 +212,6 @@ class MyGreenlightListener(EventListener):
                 logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id} in LNURL.")
 
 
-
 # def add_greenlight_event_listener():
 #     global sdk_services
 #     if not sdk_services:
@@ -287,7 +287,6 @@ def connect_breez(restore_only: bool = True):
         print("LSP ID:", lsp_id)
         print("LSP Info:", lsp_info)
 
-
         logging.info("Breez SDK connected successfully.")
     except Exception as e:
         logging.error(f"Error connecting to Breez: {e}")
@@ -332,10 +331,10 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
 
-    req = breez_sdk.ReceivePaymentRequest(amount_sats*1000, description=description)
+    req = breez_sdk.ReceivePaymentRequest(amount_sats * 1000, description=description)
 
     res = sdk_services.receive_payment(req)
-    
+
     try:
         bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
         payment_hash = res.ln_invoice.payment_hash  # Access the payment_hash attribute
@@ -359,7 +358,6 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
 # except Exception as error:
 #     logging.error(error)
 #     raise
-
 
 
 def extract_payment_hash(invoice: str) -> str:
