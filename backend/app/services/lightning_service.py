@@ -72,15 +72,13 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
 
             pay_res = sdk_services.pay_lnurl(req)
             logging.info("LNURL Payment successful")
-            print("PAYRES", pay_res)
             payment_hash = pay_res.data.payment.details.data.payment_hash
             return payment_hash
             # return pay_res.data.payment.payment_hash
         else:
             logging.error("Provided input is not LNURL-PAY type.")
     except Exception as error:
-        print(f"Issue with LNURL payment: {error}")
-        logging.error(error)
+        logging.error(f"Error sending LNURL payment: {error}")
         raise
 
 
@@ -96,7 +94,7 @@ def forward_payment_to_receiver(tip_id: int):
 
         receiver = db.query(User).filter(User.twitter_username == tip.recipient_twitter_username).first()
         if not receiver or not receiver.wallet_address:
-            logging.error(f"Receiver @{tip.recipient_twitter_username} not found or does not have waller address.")
+            logging.error(f"Receiver @{tip.recipient_twitter_username} not found or does not have wallet address.")
             return None
 
         address_str = receiver.wallet_address
@@ -159,8 +157,8 @@ def forward_pending_tips_for_user(user_id: int, db: Session):
 def mark_invoice_as_paid_in_db(invoice_or_hash: str):
     with SessionLocal() as db:
         tip = db.query(Tip).filter(Tip.ln_payment_hash == invoice_or_hash).first()
-        if not tip:
-            tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
+        # if not tip:
+        #     tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
         if not tip:
             return
 
@@ -190,7 +188,6 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
 class MyGreenlightListener(EventListener):
     def on_event(self, sdk_event):
         logging.info(f"[MyGreenlightListener] Received event: {sdk_event}")
-        print(f"[MyGreenlightListener] Received event: {sdk_event}")
         if isinstance(sdk_event, breez_sdk.BreezEvent.INVOICE_PAID):
             payment_hash = sdk_event.details.payment_hash
             logging.info(f"[MyGreenlightListener] Payment received, hash={payment_hash}")
@@ -276,18 +273,10 @@ def connect_breez(restore_only: bool = True):
     config.working_dir = settings.BREEZ_DATA_PATH
 
     try:
-        print("I am trying")
         my_listener = MyGreenlightListener()
         connect_request = ConnectRequest(config, seed, restore_only=restore_only)
         sdk_services = breez_sdk.connect(connect_request, my_listener)
-        print("Breez Connected Successfully")
-        info = sdk_services.node_info()
-        print("Channels balance:", info.channels_balance_msat)
-        print("On-chain balance:", info.onchain_balance_msat)
-        lsp_id = sdk_services.lsp_id()
-        lsp_info = sdk_services.lsp_info()
-        print("LSP ID:", lsp_id)
-        print("LSP Info:", lsp_info)
+        logging.info("Breez SDK connected successfully.")
 
         logging.info("Breez SDK connected successfully.")
     except Exception as e:
@@ -326,7 +315,7 @@ def connect_breez(restore_only: bool = True):
 # }
 
 
-def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip invoice"):
+def create_invoice(amount_sats: int, description: str = "Tip invoice"):
     """
     Creates a lightning invoice. Returns the BOLT11 invoice string.
     """
@@ -338,14 +327,14 @@ def create_invoice(tweet_url: str, amount_sats: int, description: str = "Tip inv
     res = sdk_services.receive_payment(req)
 
     try:
-        bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
+        # bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
         payment_hash = res.ln_invoice.payment_hash  # Access the payment_hash attribute
     except AttributeError as e:
         print(f"Error accessing response attributes: {e}")
         raise RuntimeError("Failed to parse response from receive_payment")
 
     # Return the invoice and payment hash
-    return bolt11_invoice, payment_hash, 0
+    return payment_hash
 
 
 # try:
@@ -379,20 +368,16 @@ def pull_unpaid_invoices_since(last_timestamp: datetime):
     if not sdk_services:
         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
 
-    last_timestamp = 0
-    print("Last timestamp: ", last_timestamp)
-
     req = breez_sdk.ListPaymentsRequest(
         filters=[breez_sdk.PaymentTypeFilter.SENT],
         from_timestamp=last_timestamp,
     )
     new_payments = sdk_services.list_payments(req)
-    print("New payments: ", new_payments)
     count_marked = 0
 
     for p in new_payments:
         if p.status == breez_sdk.PaymentStatus.COMPLETE:
-            bolt11_of_this_payment = p.description
-            mark_invoice_as_paid_in_db(bolt11_of_this_payment)
+            hash_of_payment = p.details.data.payment_hash
+            mark_invoice_as_paid_in_db(hash_of_payment)
             count_marked += 1
     logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")

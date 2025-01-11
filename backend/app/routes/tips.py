@@ -29,7 +29,7 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
             func.sum(Tip.amount_sats).label("total_amount_sats"),
             func.count(Tip.id).label("tip_count"),
         )
-        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange)
+        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange, Tip.tipper_display_name!="anonymous")
         .group_by(Tip.recipient_twitter_username)
         .order_by(desc("total_amount_sats"))
         .limit(10)
@@ -60,7 +60,7 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
             func.sum(Tip.amount_sats).label("total_amount_sats"),
             func.count(Tip.id).label("tip_count"),
         )
-        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange)
+        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange, Tip.tipper_display_name!="anonymous")
         .group_by(Tip.tipper_display_name)
         .order_by(desc("total_amount_sats"))
         .limit(10)
@@ -102,20 +102,18 @@ def create_tip(
                 f"Receiver {tip_data.recipient_twitter_username} not found. Tip will be held until user registers."
             )
 
-        bolt11, payment_hash, tip_fee = create_invoice(
-            tip_data.tweet_url,
+        payment_hash = create_invoice(
             tip_data.amount_sats,
-            f"Tip from anonymous - {tip_data.comment}",
+            f"⚡⚡ for https://x.com/{tip_data.recipient_twitter_username}/status/{tip_data.tweet_id}",
         )
 
         new_tip = Tip(
             tipper_display_name=tip_data.tipper_display_name or "anonymous",
             recipient_twitter_username=tip_data.recipient_twitter_username,
-            tweet_url=tip_data.tweet_url,
-            bolt11_invoice=bolt11,
+            tweet_id=tip_data.tweet_id,
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,
-            amount_sats=tip_data.amount_sats - tip_fee,
+            amount_sats=tip_data.amount_sats,
             paid_in=False,
             paid_out=False,
             created_at=datetime.utcnow(),

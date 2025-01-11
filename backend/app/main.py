@@ -77,9 +77,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    print("Starting")
     connect_breez(restore_only=True)
-    print("CONNECTION SUCCESSFUL")
 
     # logging.basicConfig(level=logging.DEBUG)
     # logger = SdkLogger()
