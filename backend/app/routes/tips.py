@@ -58,7 +58,7 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
             func.sum(Tip.amount_sats).label("total_amount_sats"),
             func.count(Tip.id).label("tip_count"),
         )
-        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange, Tip.tipper_display_name!="anonymous")
+        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange, Tip.tipper_display_name != "anonymous")
         .group_by(Tip.tipper_display_name)
         .order_by(desc("total_amount_sats"))
         .limit(10)

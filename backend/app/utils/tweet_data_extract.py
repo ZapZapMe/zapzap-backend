@@ -1,5 +1,6 @@
 from urllib.parse import urlparse
 
+
 # https://x.com/imaginator/status/1874344824528375898
 # https://x.com/imaginator/status/1874344824528375898/photo/1
 def extract_username_and_tweet_id(tweet_url: str):
@@ -12,4 +13,3 @@ def extract_username_and_tweet_id(tweet_url: str):
         return username, tweet_id
     else:
         raise ValueError("Invalid tweet URL")
-

@@ -1,12 +1,9 @@
-from datetime import datetime
 from typing import List
+
 # from models.tip import Tip
 from db import Base
 from sqlalchemy import (
-    ForeignKey,
-    BigInteger
-)
-from sqlalchemy import (
+    BigInteger,
     ForeignKey,
 )
 from sqlalchemy.orm import (
@@ -15,12 +12,24 @@ from sqlalchemy.orm import (
     relationship,
 )
 
+from .tip import Tip
+from .user import User
+
 
 class Tweet(Base):
     __tablename__ = "tweets"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    tweet_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    id: Mapped[int] = mapped_column(BigInteger, nullable=False, primary_key=True, index=True, unique=True)
+    tweet_author: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 
-    tips: Mapped[List["Tip"]] = relationship("Tip", back_populates="tweet", foreign_keys="[Tip.tweet_id]")
+    # Relationships
+    tips: Mapped[List["Tip"]] = relationship(
+        "Tip",
+        back_populates="tweet",
+        foreign_keys="[Tip.tweet_id]",
+    )
+    author: Mapped["User"] = relationship(
+        "User",
+        back_populates="authored_tweets",
+        foreign_keys=[tweet_author],
+    )
