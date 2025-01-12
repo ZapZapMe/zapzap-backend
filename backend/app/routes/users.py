@@ -2,7 +2,7 @@ import logging
 
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
-from models.user import User
+from models.db import User
 from schemas.user import (
     UserCreate,
     UserOut,

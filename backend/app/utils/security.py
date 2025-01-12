@@ -13,7 +13,7 @@ from jose import (
     JWTError,
     jwt,
 )
-from models.user import User
+from models.db import User
 from sqlalchemy.orm import Session
 
 oath2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/twitter/login")

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from models.sync_state import SyncState
+from models.db import SyncState
 from sqlalchemy.orm import Session
 
 

@@ -5,7 +5,7 @@ from config import settings
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from models.user import User
+from models.db import User
 from schemas.auth import Token
 from sqlalchemy.orm import Session
 from utils.security import create_access_token

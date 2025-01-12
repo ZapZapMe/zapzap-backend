@@ -1,10 +1,9 @@
 import logging
 from datetime import datetime, timedelta
-from utils.tweet_data_extract import extract_username_and_tweet_id
+
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
-from models.tip import Tip
-from models.user import User
+from models.db import Tip, User
 from schemas.tip import (
     LeaderboardReceived,
     LeaderboardSent,
@@ -14,6 +13,7 @@ from schemas.tip import (
 from services.lightning_service import create_invoice
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
+from utils.tweet_data_extract import extract_username_and_tweet_id
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 

@@ -23,8 +23,7 @@ from breez_sdk import (
 )
 from config import settings
 from db import SessionLocal
-from models.tip import Tip
-from models.user import User
+from models.db import Tip, User
 from services.bip353 import resolve_recipient_via_bip353
 from sqlalchemy.orm import Session
 
