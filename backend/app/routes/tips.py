@@ -22,24 +22,23 @@ router = APIRouter(prefix="/tips", tags=["tips"])
 def get_most_tipped_users(db: Session = Depends(get_db)):
     timerange = datetime.utcnow() - timedelta(days=30)
 
-    # Query the database for tips marked as paid_in=True and created within the last 24 hours
     tips = (
         db.query(
-            Tip.recipient_twitter_username,
+            User.twitter_username.label("tip_recipient"),
             func.sum(Tip.amount_sats).label("total_amount_sats"),
             func.count(Tip.id).label("tip_count"),
         )
-        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange, Tip.tipper_display_name!="anonymous")
-        .group_by(Tip.recipient_twitter_username)
+        .join(User, User.id == Tip.tip_recipient)
+        .filter(Tip.paid_in.is_(True), Tip.created_at >= timerange)
+        .group_by(User.twitter_username)
         .order_by(desc("total_amount_sats"))
         .limit(10)
         .all()
     )
 
-    # Convert the query result to a list of UserTipSummary
     result = [
         LeaderboardReceived(
-            recipient_twitter_username=tip.recipient_twitter_username,
+            tip_recipient=tip.tip_recipient,
             total_amount_sats=tip.total_amount_sats,
             tip_count=tip.tip_count,
         )
@@ -53,7 +52,6 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
 def get_most_active_tippers(db: Session = Depends(get_db)):
     timerange = datetime.utcnow() - timedelta(days=30)
 
-    # Query the database for tips created within the last 24 hours
     tips = (
         db.query(
             Tip.tipper_display_name,
@@ -90,7 +88,6 @@ def create_tip(
         username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
 
         receiver = db.query(User).filter(User.twitter_username == username)
-        print("Receiver: ", receiver)
 
         if receiver:
             if not receiver.wallet_address:

@@ -8,8 +8,18 @@ source .env
 uvicorn main:app --reload --host 0.0.0.0 --port 2121
 ```
 You will need to setup a local proxy to the production database. Install https://github.com/GoogleCloudPlatform/cloud-sql-proxy and run: 
+
 ```bash
+# command line
 ./cloud_sql_proxy -instances=zapzap-me:europe-west1:postgres-instance=tcp:127.0.0.1:5432
+
+# via Docker
+docker run -d \
+  -v ~/.config/gcloud/application_default_credentials.json:/path/to/service-account-key.json \
+  -p 127.0.0.1:5432:5432 \
+  gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.2 \
+  --address 0.0.0.0 --port 5432 \
+  --credentials-file /path/to/service-account-key.json instances=zapzap-me:europe-west1
 ```
 
 ## Running Locally (Docker)
@@ -39,3 +49,19 @@ gcloud run deploy cloudrun-service  --image europe-west1-docker.pkg.dev/zapzap-m
    ```bash
    pip install black ruff pre-commit
    ```
+
+
+
+## Database Schema Changes
+
+```bash
+# ensure we're at head
+cd backend/app
+alembic upgrade head
+
+# create a new revision
+alembic revision --autogenerate -m "add tweet.user_id with not null"
+
+# make change
+alembic upgrade head
+```
