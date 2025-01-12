@@ -53,10 +53,13 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.twitter_username == twitter_username).first()
 
     if not user:
-        user = User(twitter_username=twitter_username)
+        user = User(twitter_username=twitter_username, is_registered=True)
         db.add(user)
-        db.commit()
-        db.refresh(user)  # Refresh the user object to reflect committed changes
+    else:
+        user.is_registered = True
+
+    db.commit()
+    db.refresh(user)
 
     access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)
     token = create_access_token(data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires)

@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-
+from utils.tweet_data_extract import extract_username_and_tweet_id
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.tip import Tip
@@ -87,9 +87,10 @@ def create_tip(
     # current_user: User = Depends(get_current_user),
 ):
     try:
-        receiver = (
-            db.query(User).filter(User.twitter_username == tip_data.recipient_twitter_username.lstrip("@")).first()
-        )
+        username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
+
+        receiver = db.query(User).filter(User.twitter_username == username)
+        print("Receiver: ", receiver)
 
         if receiver:
             if not receiver.wallet_address:
@@ -108,8 +109,8 @@ def create_tip(
         )
 
         new_tip = Tip(
-            tipper_display_name=tip_data.tipper_display_name or "anonymous",
-            recipient_twitter_username=tip_data.recipient_twitter_username,
+            tipper_display_name=tip_data.tip_sender or "anonymous",
+            recipient_twitter_username=tip_data.tip_recipient,
             tweet_id=tip_data.tweet_id,
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,

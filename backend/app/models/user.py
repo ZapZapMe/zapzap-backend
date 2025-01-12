@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List
-
+# from models.tip import Tip
 from db import Base
 
 # from .tip import Tip
@@ -9,7 +9,6 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
 )
-
 
 class User(Base):
     __tablename__ = "users"
@@ -21,5 +20,6 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(default=False)
     is_registered: Mapped[bool] = mapped_column(default=False, nullable=False)
 
-    received_tips: Mapped[List["Tip"]] = relationship(back_populates="recipient", foreign_keys="[Tip.tip_recipient]")
-    sent_tips: Mapped[List["Tip"]] = relationship(back_populates="sender", foreign_keys="[Tip.tip_sender]")
+    received_tips: Mapped[List["Tip"]] = relationship("Tip", back_populates="recipient", foreign_keys="[Tip.tip_recipient]")
+    sent_tips: Mapped[List["Tip"]] = relationship("Tip", back_populates="sender", foreign_keys="[Tip.tip_sender]")
+

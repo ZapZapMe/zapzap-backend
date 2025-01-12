@@ -50,7 +50,7 @@ def list_users(db: Session = Depends(get_db)):
     return users
 
 
-@router.post("/", response_model=UserOut)
+@router.post("/", response_model=UserCreate)
 def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.twitter_username == user_data.twitter_username).first()
     if existing_user:

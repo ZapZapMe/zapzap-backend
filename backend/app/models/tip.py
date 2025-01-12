@@ -18,9 +18,13 @@ class Tip(Base):
     __tablename__ = "tip"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    #Forein keys
     tip_sender: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)  # null = anonymous
     tip_recipient: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     tweet_id: Mapped[int] = mapped_column(ForeignKey("tweets.id"), nullable=False)
+
+
     ln_payment_hash: Mapped[str] = mapped_column(nullable=False, index=True)
     comment: Mapped[str] = mapped_column(nullable=True)
     amount_sats: Mapped[int] = mapped_column(nullable=False)
@@ -31,4 +35,4 @@ class Tip(Base):
 
     sender: Mapped["User"] = relationship("User", foreign_keys=[tip_sender], back_populates="sent_tips")
     recipient: Mapped["User"] = relationship("User", foreign_keys=[tip_recipient], back_populates="received_tips")
-    tweetFK: Mapped["Tweet"] = relationship("Tweet", foreign_keys=[tweet_id], back_populates="tweetFK")
+    tweet: Mapped["Tweet"] = relationship("Tweet", foreign_keys=[tweet_id], back_populates="tips")

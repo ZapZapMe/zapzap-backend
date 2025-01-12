@@ -10,21 +10,21 @@ from pydantic import (
 
 
 class TipCreate(BaseModel):
-    recipient_twitter_username: str
+    # tip_recipient: int
     amount_sats: int
     comment: Optional[str] = None
     tweet_url: HttpUrl
-    tipper_display_name: Optional[str] = "anonymous"
+    tip_sender: Optional[str] = "anonymous"
 
 
 class TipOut(BaseModel):
     id: int
+    tip_sender: Optional[str]
     amount_sats: int
     comment: Optional[str]
-    bolt11_invoice: str
-    recipient_twitter_username: str
+    tip_recipient: int
     created_at: datetime
-    tweet_url: str
+    tweet_id: int
     paid_in: bool
     paid_out: bool
     ln_payment_hash: Optional[str] = None
@@ -40,12 +40,12 @@ class TipUpdate(BaseModel):
 
 
 class LeaderboardReceived(BaseModel):
-    recipient_twitter_username: str
+    tip_recipient: str
     total_amount_sats: int
     tip_count: int
 
 
 class LeaderboardSent(BaseModel):
-    tipper_display_name: str
+    tip_sender: str
     total_amount_sats: int
     tip_count: int
