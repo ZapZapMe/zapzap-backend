@@ -19,6 +19,7 @@ class Settings:
     TWITTER_CLIENT_ID = os.environ.get("TWITTER_CLIENT_ID")
     TWITTER_CLIENT_SECRET = os.environ.get("TWITTER_CLIENT_SECRET")
     TWITTER_REDIRECT_URI = os.environ.get("TWITTER_REDIRECT_URI")
+    TWITTER_ACCOUNT_BEARER_TOKEN = os.environ.get("TWITTER_ACCOUNT_BEARER_TOKEN")
 
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
     JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")

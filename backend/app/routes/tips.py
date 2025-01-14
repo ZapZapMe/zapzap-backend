@@ -14,6 +14,7 @@ from services.lightning_service import create_invoice
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from utils.tweet_data_extract import extract_username_and_tweet_id
+from utils.security import get_current_user
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
@@ -42,6 +43,7 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
+    print("TIPS: ", tips)
 
     # Build the response using the matching field names
     result = [
@@ -56,15 +58,16 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
     return result
 
 
+# most sent
 @router.get("/leaderboard_sent", response_model=list[LeaderboardSent])
 def get_most_active_tippers(db: Session = Depends(get_db)):
     timerange = datetime.utcnow() - timedelta(days=30)
 
     tips = (
         db.query(
-            User.twitter_username.label("username"),
-            func.count(Tip.id).label("number_of_tips"),
-            func.sum(Tip.amount_sats).label("sum_of_tips"),
+            User.twitter_username.label("tip_sender"),
+            func.count(Tip.id).label("tip_count"),
+            func.sum(Tip.amount_sats).label("total_amount_sats"),
         )
         .join(Tip, User.id == Tip.tip_sender)
         .filter(
@@ -76,18 +79,17 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
         .order_by(func.sum(Tip.amount_sats).desc())
         .all()
     )
-
-    leaderboard = []
-    for row in tips:
-        leaderboard.append(
-            {
-                "username": row.username,
-                "number_of_tips": row.number_of_tips,
-                "sum_of_tips": row.sum_of_tips,
-            }
+    print("TIPS: ", tips)
+    result = [
+        LeaderboardSent(
+            tip_sender=tip.tip_sender,
+            total_amount_sats=tip.total_amount_sats,
+            tip_count=tip.tip_count,
         )
+        for tip in tips
+    ]
 
-    return leaderboard
+    return result
 
 
 @router.post("/", response_model=TipOut)
@@ -98,41 +100,52 @@ def create_tip(
 ):
     try:
         username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
+        tweet = db.query(Tweet).filter(Tweet.id == tweet_id).first()
+        if not tweet:
+            logging.info(f"Tweet {tweet_id} not found. Creating new tweet.")
+            receiver = db.query(User).filter(User.twitter_username == username).first()
 
-        receiver = db.query(User).filter(User.twitter_username == username).first()
+            if receiver:
+                if not receiver.wallet_address:
+                    logging.warning(
+                        f"Receiver {receiver.twitter_username} does not have a bolt12 address. Tip will be held."
+                    )
 
-        if receiver:
-            if not receiver.wallet_address:
+            else:
                 logging.warning(
-                    f"Receiver {receiver.twitter_username} does not have a bolt12 address. Tip will be held."
+                    f"Receiver {username} not found. Tip will be held until user registers."
                 )
+            tweet_author_id = receiver.id if receiver else None
 
-        else:
-            logging.warning(
-                f"Receiver {tip_data.recipient_twitter_username} not found. Tip will be held until user registers."
+            tweet = Tweet(
+                id=tweet_id,
+                tweet_author=tweet_author_id,
             )
+            db.add(tweet)
+            db.flush()
 
-        payment_hash = create_invoice(
+        payment_hash, bolt11_invoice = create_invoice(
             tip_data.amount_sats,
-            f"⚡⚡ for https://x.com/{tip_data.recipient_twitter_username}/status/{tip_data.tweet_id}",
+            f"⚡⚡ for https://x.com/{username}/status/{tweet_id}",
         )
 
+        tip_sender_id = None
+
+
         new_tip = Tip(
-            tipper_display_name=tip_data.tip_sender or "anonymous",
-            tip_receiver=receiver.id if receiver else None,
+            tip_sender=tip_sender_id,
             tweet_id=tweet_id,
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,
             amount_sats=tip_data.amount_sats,
-            paid_in=False,
-            paid_out=False,
             created_at=datetime.utcnow(),
         )
+        
 
         db.add(new_tip)
         db.commit()
         db.refresh(new_tip)
-        print("Created NEW TIP!")
+        print("BOLT11: ", bolt11_invoice)
 
         return new_tip
 
@@ -155,3 +168,4 @@ def get_tip(tip_id: int, db: Session = Depends(get_db)):
     if not tip:
         raise HTTPException(status_code=404, detail="Tip not found.")
     return tip
+

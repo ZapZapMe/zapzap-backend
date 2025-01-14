@@ -1,7 +1,7 @@
 import logging
 import threading
 from datetime import datetime
-
+from services.twitter_service import post_reply_to_twitter_with_comment
 import breez_sdk
 import lnurl
 from breez_sdk import (
@@ -90,14 +90,18 @@ def forward_payment_to_receiver(tip_id: int):
         if not tip.paid_in:
             logging.error(f"Tip ID {tip_id} is not marked as paid.")
             return None
+        
+        if not tip.tweet:
+            logging.error(f"Tweet ID {tip.tweet_id} not found.")
+            return None
 
-        receiver = db.query(User).filter(User.twitter_username == tip.recipient_twitter_username).first()
+        receiver = tip.tweet.author
         if not receiver or not receiver.wallet_address:
-            logging.error(f"Receiver @{tip.recipient_twitter_username} not found or does not have wallet address.")
+            logging.error(f"Receiver @{receiver.twitter_username} not found or does not have wallet address.")
             return None
 
         address_str = receiver.wallet_address
-        logging.info(f"Forwarding {tip.amount_sats} sats to @{tip.recipient_twitter_username} at address {address_str}")
+        logging.info(f"Forwarding {tip.amount_sats} sats to @{receiver.twitter_username} at address {address_str}")
 
         logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
         payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
@@ -106,11 +110,15 @@ def forward_payment_to_receiver(tip_id: int):
             tip.forward_payment_hash = payment_hash
             tip.paid_out = True
             db.commit()
-            logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{tip.recipient_twitter_username}")
+            logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
+            try:
+                post_reply_to_twitter_with_comment(db, tip)
+            except Exception as e:
+                logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
             return payment_hash
         else:
             logging.error(
-                f"No payment options found for sending {tip.amount_sats} sats to @{tip.recipient_twitter_username}"
+                f"No payment options found for sending {tip.amount_sats} sats to @{receiver.twitter_username}"
             )
             return None
 
@@ -325,15 +333,16 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 
     res = sdk_services.receive_payment(req)
 
+
     try:
-        # bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
+        bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
         payment_hash = res.ln_invoice.payment_hash  # Access the payment_hash attribute
     except AttributeError as e:
         print(f"Error accessing response attributes: {e}")
         raise RuntimeError("Failed to parse response from receive_payment")
 
     # Return the invoice and payment hash
-    return payment_hash
+    return payment_hash, bolt11_invoice
 
 
 # try:

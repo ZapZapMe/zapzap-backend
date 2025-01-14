@@ -22,7 +22,6 @@ class TipOut(BaseModel):
     tip_sender: Optional[str]
     amount_sats: int
     comment: Optional[str]
-    tip_recipient: int
     created_at: datetime
     tweet_id: int
     paid_in: bool
