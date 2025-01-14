@@ -16,4 +16,5 @@ python-jose
 ruff
 sqlalchemy
 starlette
+tweepy
 uvicorn

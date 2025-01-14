@@ -1,7 +1,7 @@
 import logging
 import threading
 from datetime import datetime
-from services.twitter_service import post_reply_to_twitter_with_comment
+
 import breez_sdk
 import lnurl
 from breez_sdk import (
@@ -25,6 +25,7 @@ from config import settings
 from db import SessionLocal
 from models.db import Tip, User
 from services.bip353 import resolve_recipient_via_bip353
+from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
 
 # from sqlalchemy.orm import Session
@@ -90,7 +91,7 @@ def forward_payment_to_receiver(tip_id: int):
         if not tip.paid_in:
             logging.error(f"Tip ID {tip_id} is not marked as paid.")
             return None
-        
+
         if not tip.tweet:
             logging.error(f"Tweet ID {tip.tweet_id} not found.")
             return None
@@ -277,7 +278,7 @@ def connect_breez(restore_only: bool = True):
         settings.BREEZ_API_KEY,
         NodeConfig.GREENLIGHT(breez_sdk.GreenlightNodeConfig(partner_credentials=None, invite_code=invite_code)),
     )
-    config.working_dir = settings.BREEZ_DATA_PATH
+    config.working_dir = settings.BREEZ_WORKING_DIR
 
     try:
         my_listener = MyGreenlightListener()
@@ -285,7 +286,6 @@ def connect_breez(restore_only: bool = True):
         sdk_services = breez_sdk.connect(connect_request, my_listener)
         logging.info("Breez SDK connected successfully.")
 
-        logging.info("Breez SDK connected successfully.")
     except Exception as e:
         logging.error(f"Error connecting to Breez: {e}")
         raise
@@ -332,7 +332,6 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
     req = breez_sdk.ReceivePaymentRequest(amount_sats * 1000, description=description)
 
     res = sdk_services.receive_payment(req)
-
 
     try:
         bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute

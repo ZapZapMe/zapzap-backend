@@ -15,18 +15,18 @@ Base = declarative_base()
 def get_engine() -> sqlalchemy.engine.base.Engine:
     if settings.ENVIRONMENT == "development":
         engine = sqlalchemy.create_engine(settings.LOCAL_DATABASE_URL)
-        print("Local DB")
+        print("Connecting using Sqlite DB")
     else:
-        print("Cloud DB")
+        print("Connecting using Cloud DB")
         connector = Connector()
 
         def getconn() -> pg8000.dbapi.Connection:
             conn: pg8000.dbapi.Connection = connector.connect(
-                os.environ["INSTANCE_CONNECTION_NAME"],
+                settings.DB_INSTANCE_CONNECTION_NAME,
                 "pg8000",
-                user=os.environ["DB_USER"],
-                password=os.environ["DB_PASS"],
-                db=os.environ["DB_NAME"],
+                user=settings.DB_USER,
+                password=settings.DB_PASS,
+                db=settings.DB_NAME,
             )
             return conn
 
