@@ -105,21 +105,21 @@ def create_tip(
             logging.info(f"Tweet {tweet_id} not found. Creating new tweet.")
             receiver = db.query(User).filter(User.twitter_username == username).first()
 
-            if receiver:
+            if not receiver:
+                logging.warning(f"Receiver {username} not found in DB. Creating new user with is_registered=False.")
+                receiver = User(twitter_username=username, is_registered=False)
+                db.add(receiver)
+                db.flush()
+
+            else:
                 if not receiver.wallet_address:
                     logging.warning(
                         f"Receiver {receiver.twitter_username} does not have a bolt12 address. Tip will be held."
                     )
 
-            else:
-                logging.warning(
-                    f"Receiver {username} not found. Tip will be held until user registers."
-                )
-            tweet_author_id = receiver.id if receiver else None
-
             tweet = Tweet(
                 id=tweet_id,
-                tweet_author=tweet_author_id,
+                tweet_author=receiver.id,
             )
             db.add(tweet)
             db.flush()
@@ -145,6 +145,7 @@ def create_tip(
         db.add(new_tip)
         db.commit()
         db.refresh(new_tip)
+        logging.info(f"New tip created: {new_tip.id} for tweet {tweet_id}")
         print("BOLT11: ", bolt11_invoice)
 
         return new_tip

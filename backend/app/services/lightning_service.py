@@ -23,7 +23,7 @@ from breez_sdk import (
 )
 from config import settings
 from db import SessionLocal
-from models.db import Tip, User
+from models.db import Tip, User, Tweet
 from services.bip353 import resolve_recipient_via_bip353
 from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
@@ -127,12 +127,13 @@ def forward_payment_to_receiver(tip_id: int):
 def forward_pending_tips_for_user(user_id: int, db: Session):
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.wallet_address:
-        logging.error(f"User ID {user_id} does not exist or lacks a BOLT12 address")
+        logging.error(f"User ID {user_id} does not exist or lacks a wallet address")
         return
     pending_tips = (
         db.query(Tip)
+        .join(Tweet, Tweet.id == Tip.tweet_id)
         .filter(
-            Tip.recipient_twitter_username == user.twitter_username,
+            Tweet.tweet_author == user.id,
             Tip.paid_in.is_(True),
             Tip.paid_out.is_(False),
         )
@@ -332,7 +333,6 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
     req = breez_sdk.ReceivePaymentRequest(amount_sats * 1000, description=description)
 
     res = sdk_services.receive_payment(req)
-
     try:
         bolt11_invoice = res.ln_invoice.bolt11  # Access the ln_invoice attribute
         payment_hash = res.ln_invoice.payment_hash  # Access the payment_hash attribute
@@ -358,14 +358,14 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 #     raise
 
 
-def extract_payment_hash(invoice: str) -> str:
-    decoded_invoice = lnurl.decode(invoice)
-    payment_hash = decoded_invoice.get("payment_hash", None)
+# def extract_payment_hash(invoice: str) -> str:
+#     decoded_invoice = lnurl.decode(invoice)
+#     payment_hash = decoded_invoice.get("payment_hash", None)
 
-    if payment_hash:
-        return payment_hash
-    else:
-        raise ValueError("Payment hash not found in the invoice")
+#     if payment_hash:
+#         return payment_hash
+#     else:
+#         raise ValueError("Payment hash not found in the invoice")
 
 
 def pull_unpaid_invoices_since(last_timestamp: datetime):
