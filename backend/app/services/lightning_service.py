@@ -23,7 +23,7 @@ from breez_sdk import (
 )
 from config import settings
 from db import SessionLocal
-from models.db import Tip, User, Tweet
+from models.db import Tip, Tweet, User
 from services.bip353 import resolve_recipient_via_bip353
 from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
@@ -254,10 +254,10 @@ class MyGreenlightListener(EventListener):
 
 
 class MyLogStream(breez_sdk.LogStream):
-    def log(self, l):
+    def log(self, log):
         logging.basicConfig(level=logging.DEBUG)
-        if l.level in ("ERROR"):
-            print("Received log [", l.level, "]: ", l.line)
+        if log.level in ("ERROR", "WARNING"):
+            print("Received log [", log.level, "]: ", log.line)
 
 
 def connect_breez(restore_only: bool = True):

@@ -7,23 +7,12 @@ from fastapi import HTTPException
 from models.db import Tip
 from sqlalchemy.orm import Session
 
-# We'll create a single Tweepy client for your user tokens (the account that will post tweets)
-# Make sure your tokens have read/write access in the dev portal.
-# The account that owns these tokens will be the one replying to tweets.
-
-# Typically you'd store these in settings or environment variables
-api_key = settings.TWITTER_CLIENT_ID
-api_secret = settings.TWITTER_CLIENT_SECRET
-access_token = settings.TWITTER_ACCESS_TOKEN
-access_token_secret = settings.TWITTER_ACCESS_TOKEN_SECRET
-
 try:
-    # Create a Tweepy Client. By default in Tweepy >=4.0, this uses OAuth1 user context.
-    twitter_client = tweepy.Client(
-        consumer_key=api_key,
-        consumer_secret=api_secret,
-        access_token=access_token,
-        access_token_secret=access_token_secret,
+    TWITTER_OAUTH2_CLIENT = tweepy.Client(
+        consumer_key=settings.TWITTER_OAUTH2_CLIENT_ID,
+        consumer_secret=settings.TWITTER_OAUTH2_CLIENT_SECRET,
+        access_token=settings.TWITTER_ACCESS_TOKEN,
+        access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
     )
 except Exception as e:
     logging.error(f"Failed to initialize Tweepy client: {e}")
