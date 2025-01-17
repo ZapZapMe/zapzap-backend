@@ -112,10 +112,10 @@ def forward_payment_to_receiver(tip_id: int):
             tip.paid_out = True
             db.commit()
             logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
-            try:
-                post_reply_to_twitter_with_comment(db, tip)
-            except Exception as e:
-                logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
+            # try:
+            #     post_reply_to_twitter_with_comment(db, tip)
+            # except Exception as e:
+            #     logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
             return payment_hash
         else:
             logging.error(
@@ -175,6 +175,12 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
             tip.paid_in = True
             db.commit()
             logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
+        
+        if tip.tweet and tip.tweet.author:
+            recipient_twitter_username = tip.tweet.author.twitter_username
+        else:
+            logging.error(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} has no recipient Twitter username.")
+            recipient_twitter_username = None
 
         if not tip.paid_out:
             try:
@@ -184,7 +190,7 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
                     tip.paid_out = True
                     db.commit()
                     logging.info(
-                        f"[mark_invoice_as_paid_in_db] Forwarded {tip.amount_sats} sats to receiver @{tip.recipient_twitter_username}. Tip #{tip.id} marked as paid out."
+                        f"[mark_invoice_as_paid_in_db] Forwarded {tip.amount_sats} sats to receiver @{recipient_twitter_username}. Tip #{tip.id} marked as paid out."
                     )
                 else:
                     logging.error(f"[mark_invoice_as_paid_in_db] Forwarding payment failed for Tip #{tip.id}")
@@ -368,23 +374,25 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 #         raise ValueError("Payment hash not found in the invoice")
 
 
-def pull_unpaid_invoices_since(last_timestamp: datetime):
-    """
-    Lists all payments (both sent and received).
-    """
-    if not sdk_services:
-        raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
+# def pull_unpaid_invoices_since(last_timestamp: datetime):
+#     """
+#     Lists all payments (both sent and received).
+#     """
+#     if not sdk_services:
+#         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
+    
+#     req = breez_sdk.ListPaymentsRequest(
+#         filters=[breez_sdk.PaymentTypeFilter.RECEIVED],
+#         from_timestamp=last_timestamp,
+#     )
+#     new_payments = sdk_services.list_payments(req)
+#     print("NEW PAYMENTS", new_payments)
+#     count_marked = 0
 
-    req = breez_sdk.ListPaymentsRequest(
-        filters=[breez_sdk.PaymentTypeFilter.SENT],
-        from_timestamp=last_timestamp,
-    )
-    new_payments = sdk_services.list_payments(req)
-    count_marked = 0
+#     for p in new_payments:
+#         if p.status == breez_sdk.PaymentStatus.COMPLETE:
+#             hash_of_payment = p.details.data.payment_hash
+#             mark_invoice_as_paid_in_db(hash_of_payment)
+#             count_marked += 1
+#     logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
 
-    for p in new_payments:
-        if p.status == breez_sdk.PaymentStatus.COMPLETE:
-            hash_of_payment = p.details.data.payment_hash
-            mark_invoice_as_paid_in_db(hash_of_payment)
-            count_marked += 1
-    logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
