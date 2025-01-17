@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-
+from sqlalchemy.orm import aliased
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.db import Tip, Tweet, User
@@ -9,6 +9,7 @@ from schemas.tip import (
     LeaderboardSent,
     TipCreate,
     TipOut,
+    TipSummary
 )
 from services.lightning_service import create_invoice
 from sqlalchemy import func
@@ -18,6 +19,7 @@ from utils.security import get_current_user
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
+User2 = aliased(User)
 
 @router.get("/leaderboard_received", response_model=list[LeaderboardReceived])
 def get_most_tipped_users(db: Session = Depends(get_db)):
@@ -170,3 +172,108 @@ def get_tip(tip_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Tip not found.")
     return tip
 
+
+@router.get("/sent/{username}", response_model=list[TipSummary])
+def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.twitter_username == username).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found.")
+
+    tips = (
+        db.query(
+            User.twitter_username.label("tip_sender"),
+            Tip.amount_sats,
+            Tip.created_at,
+            Tip.tweet_id,
+            Tweet.id.label("tweet_id"),
+            User2.twitter_username.label("recipient"),
+        )
+        .join(User, User.id == Tip.tip_sender)
+        .join(Tweet, Tweet.id == Tip.tweet_id)
+        .join(User2, User2.id == Tweet.tweet_author)
+        .filter(Tip.tip_sender == user.id)
+        .all()
+    )
+
+    return [
+        TipSummary(
+            tip_sender=tip.tip_sender,
+            recipient=tip.recipient,
+            amount_sats=tip.amount_sats,
+            created_at=tip.created_at,
+            tweet_id=tip.tweet_id,
+            
+        )
+        for tip in tips
+    ]
+
+    
+    # sent_tips = (
+    #     db.query(
+    #         sender_user.twitter_username.label("tip_sender"),
+    #         recipient_user.twitter_username.label("tip_recipient"),
+    #         Tip.amount_sats,
+    #         Tip.created_at,
+    #         Tip.tweet_id,
+    #     )
+    #     .join(sender_user, sender_user.id == Tip.tip_sender)
+    #     .join(recipient_user, recipient_user.id == Tip.tip_recipient)
+    #     .filter(Tip.tip_sender == user_id)
+    #     .all()
+    # )
+
+    # sent_tips = (
+    #     db.query(
+    #         User.twitter_username.label("tip_sender"),
+    #         Tip.amount_sats,
+    #         Tip.created_at,
+    #         Tip.tweet_id,
+    #     )
+    #     .join(User, User.id == Tip.tip_sender)
+    #     .filter(Tip.tip_sender == user_id)
+    #     .all()
+    # )
+
+    # result = [
+    #     {
+    #         "tip_sender": tip.tip_sender,
+    #         "amount_sats": tip.amount_sats,
+    #         "created_at": tip.created_at,
+    #         "tweet_id": tip.tweet_id,
+    #     }
+    #     for tip in sent_tips
+    # ]
+
+    # return result
+    
+    # tips = (
+    #     db.query(
+    #         User.twitter_username.label("tip_recipient"),
+    #         func.count(Tip.id).label("tip_count"),
+    #         func.sum(Tip.amount_sats).label("total_amount_sats"),
+    #     )
+    #     .join(Tweet, Tweet.id == Tip.tweet_id)
+    #     .join(User, User.id == Tweet.tweet_author)
+    #     .filter(
+    #         Tip.tip_sender.is_not(None),  # Exclude anonymous tips
+    #         Tip.paid_in.is_(True),
+    #         Tip.created_at >= timerange,
+    #         Tip.tip_sender != Tweet.tweet_author,  # Exclude tipping themselves
+    #     )
+    #     .group_by(User.twitter_username)
+    #     .order_by(func.sum(Tip.amount_sats).desc())
+    #     .limit(10)
+    #     .all()
+
+@router.get("/received/{username}", response_model=list[TipSummary])
+def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.twitter_username == username).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="User not found.")
+    tips = (
+        db.query(Tip)
+        .join(Tweet, Tweet.id == Tip.tweet_id)
+        .filter(Tweet.tweet_author == user.id)
+        .all()
+    )
+    return [TipOut.from_orm(tip) for tip in tips]

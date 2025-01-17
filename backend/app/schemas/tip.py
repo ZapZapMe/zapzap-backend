@@ -48,3 +48,13 @@ class LeaderboardSent(BaseModel):
     tip_sender: str
     total_amount_sats: int
     tip_count: int
+
+class TipSummary(BaseModel):
+    tip_sender: Optional[str]
+    amount_sats: int
+    created_at: datetime
+    tweet_id: int
+    recipient: str
+
+    class Config:
+        orm_mode = True
