@@ -20,11 +20,6 @@ from routes import (
 from services.lightning_service import (
     # add_greenlight_event_listener,
     connect_breez,
-    pull_unpaid_invoices_since,
-)
-from utils.sync_state import (
-    get_last_sync_state,
-    set_last_sync_timestamp,
 )
 
 Base.metadata.create_all(bind=engine)
@@ -87,14 +82,14 @@ def startup_event():
     # logging.info(f"[startup_event] Greenlight event listener added, ID: {listener_id}")
     # print(f"[startup_event] Greenlight event listener added, ID: {listener_id}")
 
-    with SessionLocal() as db:
-        last_ts = get_last_sync_state(db)
+    # with SessionLocal() as db:
+    #     last_ts = get_last_sync_state(db)
 
-    pull_unpaid_invoices_since(last_ts)
+    # pull_unpaid_invoices_since(last_ts)
 
-    new_ts = int(time.time())
-    with SessionLocal() as db:
-        set_last_sync_timestamp(db, new_ts)
+    # new_ts = int(time.time())
+    # with SessionLocal() as db:
+    #     set_last_sync_timestamp(db, new_ts)
 
 
 app.include_router(users.router)
