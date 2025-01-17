@@ -13,7 +13,7 @@ SCOPES = ["tweet.read", "users.read"]
 def get_authorization_url():
     params = {
         "response_type": "code",
-        "client_id": settings.TWITTER_CLIENT_ID,
+        "client_id": settings.TWITTER_OAUTH2_CLIENT_ID,
         "redirect_uri": settings.TWITTER_REDIRECT_URI,
         "scope": " ".join(SCOPES),
         "state": "random_state_string",  # In production, generate a secure random state
@@ -28,11 +28,13 @@ async def exchange_code_for_token(code: str):
         "grant_type": "authorization_code",
         "code": code,
         "redirect_uri": settings.TWITTER_REDIRECT_URI,
-        "client_id": settings.TWITTER_CLIENT_ID,
+        "client_id": settings.TWITTER_OAUTH2_CLIENT_ID,
         "code_verifier": "challenge",
     }
     async with httpx.AsyncClient() as client:
-        r = await client.post(TOKEN_URL, data=data, auth=(settings.TWITTER_CLIENT_ID, settings.TWITTER_CLIENT_SECRET))
+        r = await client.post(
+            TOKEN_URL, data=data, auth=(settings.TWITTER_OAUTH2_CLIENT_ID, settings.TWITTER_OAUTH2_CLIENT_SECRET)
+        )
         r.raise_for_status()
         return r.json()
 
