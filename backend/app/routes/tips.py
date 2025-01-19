@@ -1,11 +1,11 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
 from config import settings
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.db import Tip, Tweet, User
-from schemas.tip import LeaderboardReceived, LeaderboardSent, TipCreate, TipOut, TipSummary
+from schemas.tip import LeaderboardReceived, LeaderboardSent, TipCreate, TipInvoice, TipOut, TipSummary
 from services.lightning_service import create_invoice
 from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy import func
@@ -20,7 +20,7 @@ User2 = aliased(User)
 # most tipped users
 @router.get("/leaderboard_received", response_model=list[LeaderboardReceived])
 def get_most_tipped_users(db: Session = Depends(get_db)):
-    timerange = datetime.utcnow() - timedelta(days=settings.LEADERBOARD_CALCULATION_WINDOW_DAYS)
+    timerange = datetime.now(timezone.utc) - timedelta(days=settings.LEADERBOARD_CALCULATION_WINDOW_DAYS)
 
     # Label the columns to match the fields in LeaderboardReceived
     tips = (
@@ -67,7 +67,7 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
 # biggest tippers
 @router.get("/leaderboard_sent", response_model=list[LeaderboardSent])
 def get_most_active_tippers(db: Session = Depends(get_db)):
-    timerange = datetime.utcnow() - timedelta(days=settings.LEADERBOARD_CALCULATION_WINDOW_DAYS)
+    timerange = datetime.now(timezone.utc) - timedelta(days=settings.LEADERBOARD_CALCULATION_WINDOW_DAYS)
 
     tips = (
         db.query(
@@ -108,7 +108,7 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
     return result
 
 
-@router.post("/", response_model=TipOut)
+@router.post("/", response_model=TipInvoice)
 def create_tip(
     tip_data: TipCreate,
     db: Session = Depends(get_db),
@@ -153,7 +153,7 @@ def create_tip(
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,
             amount_sats=tip_data.amount_sats,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         db.add(new_tip)
@@ -161,6 +161,8 @@ def create_tip(
         db.refresh(new_tip)
         logging.info(f"New tip created: {new_tip.id} for tweet {tweet_id}")
         print("BOLT11: ", bolt11_invoice)
+
+        return TipInvoice(tip_recipient=username, amount_sats=new_tip.amount_sats, bolt11_invoice=bolt11_invoice)
 
         return new_tip
 

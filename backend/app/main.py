@@ -1,13 +1,8 @@
-# from backend.app.models import user
-import logging
-import time
+from contextlib import asynccontextmanager
 
-import breez_sdk
-from breez_sdk import ConnectRequest, EnvironmentType, EventListener, NodeConfig, default_config, mnemonic_to_seed
 from config import settings
 from db import (
     Base,
-    SessionLocal,
     engine,
 )
 from fastapi import FastAPI
@@ -18,12 +13,21 @@ from routes import (
     users,
 )
 from services.lightning_service import (
-    # add_greenlight_event_listener,
     connect_breez,
 )
 
 Base.metadata.create_all(bind=engine)
-app = FastAPI(title="ZapZap Backend")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    connect_breez(restore_only=True)
+    yield
+    print("ZapZap Backend is shutting down...")
+
+
+app = FastAPI(title="ZapZap Backend", lifespan=lifespan)
+
 
 origins = [
     "https://zap-zap.me",
@@ -38,58 +42,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# class SdkLogger(Logger):
-#     def log(log_entry: LogEntry):
-#         logging.debug("Received log [", log_entry.level, "]: ", log_entry.line)
-
-
-# def set_logger(logger: SdkLogger):
-#     try:
-#         breez_sdk_liquid.set_logger(logger)
-#     except Exception as error:
-#         logging.error(error)
-#         raise
-
-
-# class SdkLogger(Logger):
-#     def log(self, log_entry: LogEntry):
-#         log_level = log_entry.level
-#         log_line = log_entry.line
-
-#         print(f"[SDK {log_level} and {log_line}]")
-
-
-# def initialize_logger():
-#     try:
-#         breez_sdk_liquid.set_logger(SdkLogger())
-#         print("Breez SDK Logger initiated.")
-#     except Exception as e:
-#         print("Failed to initialize logger", e)
-#         raise
-
-
-@app.on_event("startup")
-def startup_event():
-    connect_breez(restore_only=True)
-
-    # logging.basicConfig(level=logging.DEBUG)
-    # logger = SdkLogger()
-    # set_logger(logger)
-
-    # listener_id = add_greenlight_event_listener()
-    # logging.info(f"[startup_event] Greenlight event listener added, ID: {listener_id}")
-    # print(f"[startup_event] Greenlight event listener added, ID: {listener_id}")
-
-    # with SessionLocal() as db:
-    #     last_ts = get_last_sync_state(db)
-
-    # pull_unpaid_invoices_since(last_ts)
-
-    # new_ts = int(time.time())
-    # with SessionLocal() as db:
-    #     set_last_sync_timestamp(db, new_ts)
 
 
 app.include_router(users.router)

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from db import Base
@@ -15,9 +15,10 @@ from sqlalchemy.orm import (
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True, unique=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
     twitter_username: Mapped[str] = mapped_column(index=True, unique=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(nullable=True)
     avatar_updated_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -40,6 +41,7 @@ class User(Base):
 
 class Tip(Base):
     __tablename__ = "tip"
+    __table_args__ = {}
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True, unique=True)
 
@@ -54,7 +56,7 @@ class Tip(Base):
     paid_in: Mapped[bool] = mapped_column(default=False)
     paid_out: Mapped[bool] = mapped_column(default=False)
     forward_payment_hash: Mapped[Optional[str]] = mapped_column(nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
 
     # Relationships
     sender: Mapped[Optional["User"]] = relationship(
@@ -71,6 +73,7 @@ class Tip(Base):
 
 class Tweet(Base):
     __tablename__ = "tweets"
+    __table_args__ = {"extend_existing": True}
 
     id: Mapped[int] = mapped_column(BigInteger, nullable=False, primary_key=True, index=True, unique=True)
     tweet_author: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)

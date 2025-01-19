@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import (
     Optional,
 )
@@ -28,6 +28,7 @@ class TipOut(BaseModel):
     paid_out: bool
     ln_payment_hash: Optional[str] = None
     forward_payment_hash: Optional[str] = None
+    bolt11_invoice: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -61,3 +62,9 @@ class TipSummary(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class TipInvoice(BaseModel):
+    tip_recipient: str
+    amount_sats: int
+    bolt11_invoice: str

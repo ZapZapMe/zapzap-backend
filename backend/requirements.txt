@@ -11,6 +11,7 @@ pg8000
 pre-commit
 psycopg2-binary
 pydantic
+pytest
 python-dotenv
 python-jose
 ruff

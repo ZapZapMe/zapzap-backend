@@ -1,6 +1,6 @@
 # services/twitter_service.py
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 
 import tweepy
@@ -83,7 +83,7 @@ def get_avatars_for_usernames(
     Fetches from DB if still valid (less than refresh_interval_weeks old),
     otherwise calls Twitter API and updates DB.
     """
-    cutoff = datetime.utcnow() - timedelta(weeks=refresh_interval_weeks)
+    cutoff = datetime.now(timezone.utc) - timedelta(weeks=refresh_interval_weeks)
     # Fetch existing users from DB
     existing_users = db.query(User).filter(User.twitter_username.in_(usernames)).all()
     user_map = {u.twitter_username.lower(): u for u in existing_users}
@@ -117,7 +117,7 @@ def get_avatars_for_usernames(
                         db.add(db_user)
                         user_map[uname] = db_user
                     db_user.avatar_url = avatar_url
-                    db_user.avatar_updated_at = datetime.utcnow()
+                    db_user.avatar_updated_at = datetime.now(timezone.utc)
                 db.commit()
         except Exception as e:
             logging.error(f"Error calling Twitter API: {e}")
