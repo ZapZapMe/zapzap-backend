@@ -1,26 +1,23 @@
 import logging
 from datetime import datetime, timedelta
-from sqlalchemy.orm import aliased
+
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.db import Tip, Tweet, User
-from schemas.tip import (
-    LeaderboardReceived,
-    LeaderboardSent,
-    TipCreate,
-    TipOut,
-    TipSummary
-)
+from schemas.tip import LeaderboardReceived, LeaderboardSent, TipCreate, TipOut, TipSummary
 from services.lightning_service import create_invoice
+from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy import func
-from sqlalchemy.orm import Session
-from utils.tweet_data_extract import extract_username_and_tweet_id
+from sqlalchemy.orm import Session, aliased
 from utils.security import get_current_user
+from utils.tweet_data_extract import extract_username_and_tweet_id
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
 User2 = aliased(User)
 
+
+# most tipped users
 @router.get("/leaderboard_received", response_model=list[LeaderboardReceived])
 def get_most_tipped_users(db: Session = Depends(get_db)):
     timerange = datetime.utcnow() - timedelta(days=30)
@@ -38,29 +35,36 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
             Tip.tip_sender.is_not(None),  # Exclude anonymous tips
             Tip.paid_in.is_(True),
             Tip.created_at >= timerange,
-            Tip.tip_sender != Tweet.tweet_author,  # Exclude tipping themselves
+            Tip.tip_sender != Tweet.tweet_author,  # Exclude self-tips
         )
         .group_by(User.twitter_username)
         .order_by(func.sum(Tip.amount_sats).desc())
         .limit(10)
         .all()
     )
-    print("TIPS: ", tips)
+    # Get the usernames from the query results
+    usernames = [t.tip_recipient for t in tips]
 
-    # Build the response using the matching field names
-    result = [
-        LeaderboardReceived(
-            tip_recipient=tip.tip_recipient,
-            total_amount_sats=tip.total_amount_sats,
-            tip_count=tip.tip_count,
+    # Get avatars in one batch call
+    avatars_map = get_avatars_for_usernames(usernames, db)
+
+    # Build the final response
+    result = []
+    for t in tips:
+        avatar_url = avatars_map.get(t.tip_recipient) or ""
+        result.append(
+            LeaderboardReceived(
+                tip_recipient=t.tip_recipient,
+                total_amount_sats=t.total_amount_sats,
+                tip_count=t.tip_count,
+                avatar_url=avatar_url,
+            )
         )
-        for tip in tips
-    ]
 
     return result
 
 
-# most sent
+# biggest tippers
 @router.get("/leaderboard_sent", response_model=list[LeaderboardSent])
 def get_most_active_tippers(db: Session = Depends(get_db)):
     timerange = datetime.utcnow() - timedelta(days=30)
@@ -79,17 +83,27 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
         )
         .group_by(User.twitter_username)
         .order_by(func.sum(Tip.amount_sats).desc())
+        .limit(10)
         .all()
     )
-    print("TIPS: ", tips)
-    result = [
-        LeaderboardSent(
-            tip_sender=tip.tip_sender,
-            total_amount_sats=tip.total_amount_sats,
-            tip_count=tip.tip_count,
+    # Get the usernames from the query results
+    usernames = [t.tip_sender for t in tips]
+
+    # Get avatars in one batch call
+    avatars_map = get_avatars_for_usernames(usernames, db)
+
+    # Build the response
+    result = []
+    for t in tips:
+        avatar_url = avatars_map.get(t.tip_sender) or ""
+        result.append(
+            LeaderboardSent(
+                tip_sender=t.tip_sender,
+                total_amount_sats=t.total_amount_sats,
+                tip_count=t.tip_count,
+                avatar_url=avatar_url,  # Add avatar URL to your schema if needed
+            )
         )
-        for tip in tips
-    ]
 
     return result
 
@@ -133,7 +147,6 @@ def create_tip(
 
         tip_sender_id = None
 
-
         new_tip = Tip(
             tip_sender=tip_sender_id,
             tweet_id=tweet_id,
@@ -142,7 +155,6 @@ def create_tip(
             amount_sats=tip_data.amount_sats,
             created_at=datetime.utcnow(),
         )
-        
 
         db.add(new_tip)
         db.commit()
@@ -202,12 +214,10 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
             amount_sats=tip.amount_sats,
             created_at=tip.created_at,
             tweet_id=tip.tweet_id,
-            
         )
         for tip in tips
     ]
 
-    
     # sent_tips = (
     #     db.query(
     #         sender_user.twitter_username.label("tip_sender"),
@@ -245,7 +255,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
     # ]
 
     # return result
-    
+
     # tips = (
     #     db.query(
     #         User.twitter_username.label("tip_recipient"),
@@ -265,15 +275,11 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
     #     .limit(10)
     #     .all()
 
+
 @router.get("/received/{username}", response_model=list[TipSummary])
 def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.twitter_username == username).first()
     if not user:
         raise HTTPException(status_code=400, detail="User not found.")
-    tips = (
-        db.query(Tip)
-        .join(Tweet, Tweet.id == Tip.tweet_id)
-        .filter(Tweet.tweet_author == user.id)
-        .all()
-    )
+    tips = db.query(Tip).join(Tweet, Tweet.id == Tip.tweet_id).filter(Tweet.tweet_author == user.id).all()
     return [TipOut.from_orm(tip) for tip in tips]

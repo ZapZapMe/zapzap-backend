@@ -1,31 +1,18 @@
 import logging
 import threading
-from datetime import datetime
 
 import breez_sdk
-import lnurl
 from breez_sdk import (
     ConnectRequest,
     EnvironmentType,
     EventListener,
-    ListPaymentsRequest,
     NodeConfig,
-    Payment,
-    PaymentStatus,
-    PaymentType,
-    PaymentTypeFilter,
-    ReceivePaymentRequest,
-    SendPaymentRequest,
     default_config,
     mnemonic_to_seed,
-    parse_input,
-    parse_invoice,
 )
 from config import settings
 from db import SessionLocal
 from models.db import Tip, Tweet, User
-from services.bip353 import resolve_recipient_via_bip353
-from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
 
 # from sqlalchemy.orm import Session
@@ -175,7 +162,7 @@ def mark_invoice_as_paid_in_db(invoice_or_hash: str):
             tip.paid_in = True
             db.commit()
             logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
-        
+
         if tip.tweet and tip.tweet.author:
             recipient_twitter_username = tip.tweet.author.twitter_username
         else:
@@ -253,7 +240,7 @@ class MyGreenlightListener(EventListener):
 #                 mark_invoice_as_paid_in_db(payment.payment_hash)
 
 
-class MyLogStream(breez_sdk.LogStream):
+class BreezLogger(breez_sdk.LogStream):
     def log(self, log):
         logging.basicConfig(level=logging.DEBUG)
         if log.level in ("ERROR", "WARNING"):
@@ -268,22 +255,16 @@ def connect_breez(restore_only: bool = True):
     """
 
     global sdk_services
-    breez_sdk.set_log_stream(MyLogStream())
-
-    # For dev, you might use a BIP39 test mnemonic or create your own
-    # In production, store your real mnemonic in a safe place (not in code).
-    # For now, let's assume you have it in environment:
-    # e.g. MNEMONIC="abandon abandon abandon ... rocket manual"
-    mnemonic = settings.BREEZ_MNEMONIC
-    seed = mnemonic_to_seed(mnemonic)
-
-    invite_code = settings.BREEZ_GREENLIGHT_INVITE
+    breez_sdk.set_log_stream(BreezLogger())
+    seed = mnemonic_to_seed(settings.BREEZ_MNEMONIC)
 
     # Build the Breez config
     config = default_config(
         EnvironmentType.PRODUCTION,
         settings.BREEZ_API_KEY,
-        NodeConfig.GREENLIGHT(breez_sdk.GreenlightNodeConfig(partner_credentials=None, invite_code=invite_code)),
+        NodeConfig.GREENLIGHT(
+            breez_sdk.GreenlightNodeConfig(partner_credentials=None, invite_code=settings.BREEZ_GREENLIGHT_INVITE)
+        ),
     )
     config.working_dir = settings.BREEZ_WORKING_DIR
 
@@ -380,7 +361,7 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 #     """
 #     if not sdk_services:
 #         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
-    
+
 #     req = breez_sdk.ListPaymentsRequest(
 #         filters=[breez_sdk.PaymentTypeFilter.RECEIVED],
 #         from_timestamp=last_timestamp,
@@ -395,4 +376,3 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 #             mark_invoice_as_paid_in_db(hash_of_payment)
 #             count_marked += 1
 #     logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
-

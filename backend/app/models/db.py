@@ -17,8 +17,10 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True, unique=True)
-    twitter_username: Mapped[str] = mapped_column(index=True, unique=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    twitter_username: Mapped[str] = mapped_column(index=True, unique=True)
+    avatar_url: Mapped[Optional[str]] = mapped_column(nullable=True)
+    avatar_updated_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     wallet_address: Mapped[Optional[str]] = mapped_column(nullable=True, index=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
     is_registered: Mapped[bool] = mapped_column(default=False, nullable=False)

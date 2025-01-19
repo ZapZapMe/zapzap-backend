@@ -3,7 +3,7 @@ from logging.config import fileConfig
 
 from alembic import context
 from db import Base, engine
-from models.db import SyncState, Tip, Tweet, User
+from models.db import Tip, Tweet, User
 from sqlalchemy import engine_from_config
 
 target_metadata = Base.metadata

@@ -42,12 +42,15 @@ class LeaderboardReceived(BaseModel):
     tip_recipient: str
     total_amount_sats: int
     tip_count: int
+    avatar_url: Optional[HttpUrl] = None
 
 
 class LeaderboardSent(BaseModel):
     tip_sender: str
     total_amount_sats: int
     tip_count: int
+    avatar_url: Optional[HttpUrl] = None
+
 
 class TipSummary(BaseModel):
     tip_sender: Optional[str]
