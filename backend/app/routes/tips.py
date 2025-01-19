@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from config import settings
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.db import Tip, Tweet, User
@@ -9,7 +10,6 @@ from services.lightning_service import create_invoice
 from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
-from utils.security import get_current_user
 from utils.tweet_data_extract import extract_username_and_tweet_id
 
 router = APIRouter(prefix="/tips", tags=["tips"])
@@ -20,7 +20,7 @@ User2 = aliased(User)
 # most tipped users
 @router.get("/leaderboard_received", response_model=list[LeaderboardReceived])
 def get_most_tipped_users(db: Session = Depends(get_db)):
-    timerange = datetime.utcnow() - timedelta(days=30)
+    timerange = datetime.utcnow() - timedelta(days=settings.LEADERBOARD_CALCULATION_WINDOW_DAYS)
 
     # Label the columns to match the fields in LeaderboardReceived
     tips = (
@@ -67,7 +67,7 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
 # biggest tippers
 @router.get("/leaderboard_sent", response_model=list[LeaderboardSent])
 def get_most_active_tippers(db: Session = Depends(get_db)):
-    timerange = datetime.utcnow() - timedelta(days=30)
+    timerange = datetime.utcnow() - timedelta(days=settings.LEADERBOARD_CALCULATION_WINDOW_DAYS)
 
     tips = (
         db.query(
