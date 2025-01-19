@@ -1,5 +1,3 @@
-import os
-
 import pg8000
 import sqlalchemy
 from config import settings
