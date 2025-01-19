@@ -1,7 +1,9 @@
 [project]
-name = "zapzap"
+name = "ZapZap"
+version = "0.1.0"
 description = "ZapZap Backend"
-requires-python = ">=3.12"
+requires-python = "3.12.2"
+dependencies = []
 
 [tool.ruff]
 line-length = 120
@@ -16,3 +18,7 @@ line-ending = "auto"
 [tool.Ruff.lint.isort]
 force-wrap-aliases = true
 include_trailing_comma = true
+
+[tool.pytest.ini_options]
+pythonpath = [ "backend/app"]
+testpaths = ["backend/tests"]
