@@ -21,6 +21,8 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
     twitter_username: Mapped[str] = mapped_column(index=True, unique=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(nullable=True)
+    twitter_access_token: Mapped[Optional[str]] = mapped_column(nullable=True)
+    twitter_refresh_token: Mapped[Optional[str]] = mapped_column(nullable=True)
     avatar_updated_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     wallet_address: Mapped[Optional[str]] = mapped_column(nullable=True, index=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
@@ -89,10 +91,3 @@ class Tweet(Base):
         back_populates="authored_tweets",
         foreign_keys=[tweet_author],
     )
-
-
-# class SyncState(Base):
-#     __tablename__ = "sync_state"
-
-#     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-#     last_timestamp: Mapped[int] = mapped_column(nullable=False, default=0)
