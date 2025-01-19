@@ -2,7 +2,7 @@
 name = "ZapZap"
 version = "0.1.0"
 description = "ZapZap Backend"
-requires-python = "3.12.2"
+requires-python = ">= 3.12"
 dependencies = []
 
 [tool.ruff]
