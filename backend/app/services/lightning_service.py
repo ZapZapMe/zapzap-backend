@@ -213,33 +213,6 @@ class MyGreenlightListener(EventListener):
                 logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id} in LNURL.")
 
 
-# def add_greenlight_event_listener():
-#     global sdk_services
-#     if not sdk_services:
-#         raise RuntimeError("Greenlight SDK not connected yet. Call connect_breez() first.")
-
-#     listener = MyGreenlightListener()
-#     listener_id = sdk_services.add_event_listener(sdk_services, listener)
-#     logging.info(f"Event listener initialized with ID: {listener_id}")
-#     return listener_id
-
-
-# def add_event_listener(sdk: BindingLiquidSdk, listener: SDKListener):
-#     try:
-#         listener_id = sdk.add_event_listener(listener)
-#         logging.info(f"Listener added with ID: {listener_id}")
-#         return listener_id
-
-#     except Exception as error:
-#         logging.error(error)
-#         raise
-
-#         if isinstance(event, Event.PaymentReceived):
-#             payment = event.payment
-#             if payment.status == PaymentStatus.Succeeded:
-#                 mark_invoice_as_paid_in_db(payment.payment_hash)
-
-
 class BreezLogger(breez_sdk.LogStream):
     def log(self, log):
         logging.basicConfig(level=logging.DEBUG)
@@ -279,37 +252,6 @@ def connect_breez(restore_only: bool = True):
         raise
 
 
-# try:
-#     connect_request = ConnectRequest(config, mnemonic)
-#     sdk = connect(connect_request)
-#     return sdk
-# except Exception as error:
-#     logging.error(error)
-#     raise
-
-
-# def get_balance():
-#     try:
-#         info = sdk_services.get_info()
-#         balance_sats = info.balance_sat
-#         pending_sats = info.pending_send_sat
-#         pending_receive_sats = info.pending_receive_sat
-#     except Exception as error:
-#         logging.error(error)
-#         raise
-
-# if not sdk_services:
-#     raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
-
-# node_state = sdk_services.node_info()
-# ln_balance = node_state.channels_balance_msat
-# onchain_balance = node_state.onchain_balance_msat
-# return {
-#     "lightning_balance_msat": ln_balance,
-#     "onchain_balance_msat": onchain_balance,
-# }
-
-
 def create_invoice(amount_sats: int, description: str = "Tip invoice"):
     """
     Creates a lightning invoice. Returns the BOLT11 invoice string.
@@ -329,50 +271,3 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 
     # Return the invoice and payment hash
     return payment_hash, bolt11_invoice
-
-
-# try:
-#     # Set the invoice amount you wish the payer to send, which should be within the above limits
-#     prepare_request = PrepareReceiveRequest(PaymentMethod.LIGHTNING, 5_000)
-#     prepare_response = sdk.prepare_receive_payment(prepare_request)
-
-#     # If the fees are acceptable, continue to create the Receive Payment
-#     receive_fees_sat = prepare_response.fees_sat
-#     logging.debug("Fees: ", receive_fees_sat, " sats")
-#     return prepare_response
-# except Exception as error:
-#     logging.error(error)
-#     raise
-
-
-# def extract_payment_hash(invoice: str) -> str:
-#     decoded_invoice = lnurl.decode(invoice)
-#     payment_hash = decoded_invoice.get("payment_hash", None)
-
-#     if payment_hash:
-#         return payment_hash
-#     else:
-#         raise ValueError("Payment hash not found in the invoice")
-
-
-# def pull_unpaid_invoices_since(last_timestamp: datetime):
-#     """
-#     Lists all payments (both sent and received).
-#     """
-#     if not sdk_services:
-#         raise RuntimeError("Breez SDK not connected yet. Call connect_breez() first.")
-
-#     req = breez_sdk.ListPaymentsRequest(
-#         filters=[breez_sdk.PaymentTypeFilter.RECEIVED],
-#         from_timestamp=last_timestamp,
-#     )
-#     new_payments = sdk_services.list_payments(req)
-#     print("NEW PAYMENTS", new_payments)
-#     count_marked = 0
-
-#     for p in new_payments:
-#         if p.status == breez_sdk.PaymentStatus.COMPLETE:
-#             hash_of_payment = p.details.data.payment_hash
-#             mark_invoice_as_paid_in_db(hash_of_payment)
-#             count_marked += 1
-#     logging.info(f"[pull_unpaid_invoices_since] Marked {count_marked} new invoices as paid!")
