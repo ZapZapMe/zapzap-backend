@@ -83,7 +83,7 @@ def get_avatars_for_usernames(
     Fetches from DB if still valid (less than refresh_interval_weeks old),
     otherwise calls Twitter API and updates DB.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(weeks=refresh_interval_weeks)
+    cutoff = datetime.now() - timedelta(weeks=settings.TWITTER_AVATAR_CACHE_TTL_DAYS)
     # Fetch existing users from DB
     existing_users = db.query(User).filter(User.twitter_username.in_(usernames)).all()
     user_map = {u.twitter_username.lower(): u for u in existing_users}
