@@ -63,11 +63,7 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
 
     access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)
     token = create_access_token(data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires)
-    frontend_url = "https://zap-zap.me/"
-    # or for local dev:
-    # frontend_url = "http://localhost:3000"
-
-    redirect_url = f"{frontend_url}?token={token}"
+    redirect_url = f"{settings.FRONTEND_URL}?token={token}"
     return RedirectResponse(url=redirect_url)
 
     # return {
