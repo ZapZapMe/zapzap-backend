@@ -19,7 +19,7 @@ def get_engine() -> sqlalchemy.engine.base.Engine:
         print("Connecting using Sqlite DB")
     else:
         db_host = os.environ.get("DB_HOST")
-        if db_host:
+        if db_host == "cloudsql-proxy":  # if we are running inside Docker Compose
             print("DB_HOST is set; connecting via host/port instead of Cloud SQL connector.")
             engine = sqlalchemy.create_engine(
                 f"postgresql+pg8000://{settings.DB_USER}:{settings.DB_PASS}@{db_host}:5432/{settings.DB_NAME}"
