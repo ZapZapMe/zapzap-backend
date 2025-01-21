@@ -7,7 +7,7 @@ AUTHORIZE_URL = "https://twitter.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
 USERINFO_URL = "https://api.twitter.com/2/users/me"
 
-SCOPES = ["tweet.read", "tweet.write", "users.read"]
+SCOPES = ["tweet.write", "users.read", "tweet.read"]
 
 
 def get_authorization_url():

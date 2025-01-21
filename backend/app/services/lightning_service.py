@@ -14,6 +14,7 @@ from config import settings
 from db import SessionLocal
 from models.db import Tip, Tweet, User
 from sqlalchemy.orm import Session
+from services.twitter_service import post_reply_to_twitter_with_comment
 
 # from sqlalchemy.orm import Session
 
@@ -99,10 +100,11 @@ def forward_payment_to_receiver(tip_id: int):
             tip.paid_out = True
             db.commit()
             logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
-            # try:
-            #     post_reply_to_twitter_with_comment(db, tip)
-            # except Exception as e:
-            #     logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
+            try:
+                print("The tip sender is ", tip.sender)
+                post_reply_to_twitter_with_comment(db, tip, user=tip.sender)
+            except Exception as e:
+                logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
             return payment_hash
         else:
             logging.error(

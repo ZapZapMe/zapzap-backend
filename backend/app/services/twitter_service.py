@@ -23,6 +23,62 @@ except Exception as e:
     twitter_client = None
 
 
+def get_user_twitter_client(user_access_token: str) -> tweepy.Client:
+    """
+    Builds a Tweepy client for user-context OAuth2 using
+    the user's personal Twitter OAuth token (with tweet.write scope).
+    """
+    print("user_access_token", user_access_token)
+    return tweepy.Client(
+        consumer_key=settings.TWITTER_OAUTH2_CLIENT_ID,
+        consumer_secret=settings.TWITTER_OAUTH2_CLIENT_SECRET,
+        access_token=user_access_token,
+    )
+
+
+def post_reply_dynamic(
+    tweet_id: str,
+    reply_text: str,
+    user: User | None
+):
+    """
+    If 'user' has twitter_access_token, post a tweet using *their* user tokens.
+    Otherwise, fallback to the global 'twitter_client' (app token).
+    """
+    # 1) If user has an access token, build a user-scoped Tweepy client
+    if user and user.twitter_access_token:
+        logging.info(f"[post_reply_dynamic] Posting with user token: @{user.twitter_username}")
+        user_client = get_user_twitter_client(user.twitter_access_token)
+        try:
+            response = user_client.create_tweet(
+                text=reply_text,
+                in_reply_to_tweet_id=tweet_id
+            )
+            logging.info(f"[post_reply_dynamic] User-level tweet posted. Response: {response.data}")
+            return response.data
+        except tweepy.TweepyException as e:
+            logging.error(f"[post_reply_dynamic] Error posting with user token: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
+
+    # 2) Fallback to the global app-level client
+    logging.info("[post_reply_dynamic] Using global app-level twitter_client...")
+    if not twitter_client:
+        raise HTTPException(status_code=400, detail="Global Twitter client not initialized.")
+
+    try:
+        response = twitter_client.create_tweet(
+            text=reply_text,
+            in_reply_to_tweet_id=tweet_id
+        )
+        logging.info(f"[post_reply_dynamic] App-level tweet posted. Response: {response.data}")
+        return response.data
+    except tweepy.TweepyException as e:
+        logging.error(f"[post_reply_dynamic] Error posting with app token: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+
 def post_reply_with_tweepy(tweet_id: str, reply_text: str):
     """
     Use Tweepy client to post a reply.
@@ -44,11 +100,11 @@ def post_reply_with_tweepy(tweet_id: str, reply_text: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-def post_reply_to_twitter_with_comment(db: Session, tip: Tip):
+def post_reply_to_twitter_with_comment(db: Session, tip: Tip, user: User | None = None):
     """
     High-level function that:
       1) Builds the reply text from 'tip'
-      2) Calls 'post_reply_with_tweepy' to post a reply.
+      2) Calls 'post_reply_dynamic' to decide whether to use user tokens or app tokens.
     """
     if not tip.tweet:
         logging.warning(f"Tweet {tip.tweet_id} not found. Skipping reply.")
@@ -58,19 +114,13 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip):
     comment = tip.comment or "No comment"
 
     tweet_author_user = tip.tweet.author
-    if tweet_author_user:
-        mention_text = f"@{tweet_author_user.twitter_username}"
-    else:
-        mention_text = "someone"
+    mention_text = f"@{tweet_author_user.twitter_username}" if tweet_author_user else "someone"
 
-    reply_text = f"{mention_text}, your tip is paid!\n" f"{comment}\n" f"#ZapZap"
+    reply_text = f"{mention_text}, your tip is paid!\n{comment}\n#ZapZap"
 
-    try:
-        response_data = post_reply_with_tweepy(tweet_id=tweet_id_str, reply_text=reply_text)
-        logging.info(f"Posted reply to tweet {tweet_id_str} for Tip #{tip.id}. Response: {response_data}")
-    except HTTPException as http_exc:
-        logging.error(f"HTTP error occurred: {http_exc.detail}")
-        raise
+    # Call our new dynamic function
+    response_data = post_reply_dynamic(tweet_id_str, reply_text, user)
+    logging.info(f"[post_reply_to_twitter_with_comment] Response: {response_data}")
 
 
 def get_avatars_for_usernames(

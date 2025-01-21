@@ -11,6 +11,7 @@ from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
 from utils.tweet_data_extract import extract_username_and_tweet_id
+from utils.security import get_current_user
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
@@ -112,7 +113,7 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
 def create_tip(
     tip_data: TipCreate,
     db: Session = Depends(get_db),
-    # current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     try:
         username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
@@ -148,7 +149,7 @@ def create_tip(
         tip_sender_id = None
 
         new_tip = Tip(
-            tip_sender=tip_sender_id,
+            tip_sender=current_user.id,
             tweet_id=tweet_id,
             ln_payment_hash=payment_hash,
             comment=tip_data.comment,

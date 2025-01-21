@@ -36,6 +36,7 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     # Exchange code for token (OAuth 2.0 flow)
     try:
         token_response = await exchange_code_for_token(code)
+        print("token_response", token_response)
     except Exception as e:
         logging.error(f"Token exchange failed: {e}")
         raise HTTPException(status_code=400, detail="Failed to exchange code for token")
@@ -57,6 +58,9 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
         db.add(user)
     else:
         user.is_registered = True
+
+    user.twitter_access_token = access_token
+    print("Saving user's access token")
 
     db.commit()
     db.refresh(user)

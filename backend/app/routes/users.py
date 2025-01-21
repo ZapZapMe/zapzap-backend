@@ -22,10 +22,11 @@ def read_users_me(current_user: User = Depends(get_current_user)):
 
 @router.put("/me", response_model=UserOut)
 def update_user_profile(
-    user_update: UserUpdate, db: Session = Depends(get_db)
+    user_update: UserUpdate, db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     
-    user = db.query(User).filter(User.twitter_username == "AyoRichie_98").first()
+    user = db.query(User).filter(User.twitter_username == current_user).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found!")
 
