@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     LOCAL_DATABASE_URL: str = "sqlite:///./zap-zap.sqlite3"
 
     # Required settings (no default value)
+    TWITTER_CONSUMER_KEY: str
+    TWITTER_CONSUMER_SECRET: str
     TWITTER_OAUTH2_CLIENT_ID: str
     TWITTER_OAUTH2_CLIENT_SECRET: str
     TWITTER_REDIRECT_URI: str
@@ -41,7 +43,7 @@ class Settings(BaseSettings):
     LEADERBOARD_CALCULATION_WINDOW_DAYS: int = 30  # a value in .env would override this
     TWITTER_AVATAR_CACHE_TTL_DAYS: int = 30
 
-    FRONTEND_URL: str = "https://zap-zap.me"
+    FRONTEND_URL: str = "http://localhost:5000"
 
     class Config:
         env_file = ".env"
