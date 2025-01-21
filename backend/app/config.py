@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     LOCAL_DATABASE_URL: str = "sqlite:///./zap-zap.sqlite3"
 
     # Required settings (no default value)
+    TWITTER_CONSUMER_KEY: str
+    TWITTER_CONSUMER_SECRET: str
     TWITTER_OAUTH2_CLIENT_ID: str
     TWITTER_OAUTH2_CLIENT_SECRET: str
     TWITTER_REDIRECT_URI: str
