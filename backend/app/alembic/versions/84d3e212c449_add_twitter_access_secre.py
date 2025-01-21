@@ -1,8 +1,8 @@
-"""add users.tip_recipient
+"""add twitter_access_secre
 
-Revision ID: 54ffaf269ec5
-Revises: 9ca517f4d6df
-Create Date: 2025-01-11 22:18:08.460462
+Revision ID: 84d3e212c449
+Revises: 9db9245deb52
+Create Date: 2025-01-21 19:48:32.048879
 
 """
 
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "54ffaf269ec5"
-down_revision: Union[str, None] = "9ca517f4d6df"
+revision: str = "84d3e212c449"
+down_revision: Union[str, None] = "9db9245deb52"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
