@@ -1,6 +1,5 @@
 import os
 
-import pg8000
 import sqlalchemy
 from config import settings
 from google.cloud.sql.connector import Connector
