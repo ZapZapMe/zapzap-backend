@@ -33,34 +33,27 @@ gcloud config set run/region europe-west1
 gcloud auth configure-docker europe-west1-docker.pkg.dev
 ```
 
-## Database access 
-
-You will need to setup a local proxy to the production database: https://github.com/GoogleCloudPlatform/cloud-sql-proxy and run: 
 
 
-```bash
-# command line
-./cloud_sql_proxy -instances=zapzap-me:europe-west1:postgres-instance=tcp:127.0.0.1:5432
 
-# via Docker
-docker run -d \
-  -v ~/.config/gcloud/application_default_credentials.json:/path/to/service-account-key.json \
-  -p 127.0.0.1:5432:5432 \
-  gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.2 \
-  --address 0.0.0.0 --port 5432 \
-  --credentials-file /path/to/service-account-key.json instances=zapzap-me:europe-west1
+
+
+
+## Running via Docker Compose (recommended)
+
+export GCLOUD_CREDENTIALS_PATH=/path/to/your/application_default_credentials.json # windows: $env:GCLOUD_CREDENTIALS_PATH = "C:\path\to\your\application_default_credentials.json"
+docker-compose up
 ```
 
-
-## Running Locally (Docker)
-
-```bash
-source .env
-docker build -t zapzap-backend -f Dockerfile
-docker run -p 8080:8080 --env ENVIRONMENT=development --env BREEZ_API_KEY=$BREEZ_API_KEY --env BREEZ_MNEMONIC=$BREEZ_MNEMONIC  --env BREEZ_GREENLIGHT_INVITE=$  zapzap-backend
+Then browse to:
+- http://127.0.0.1:5000
+- http://127.0.0.1:8080
 ```
+## Deploying
 
-## Pushing Builds (beta)
+### beta
+
+shows up at https://api-beta.zap-zap.me
 
 ```bash
 docker build --tag zapzap-backend:beta  -f Dockerfile --platform linux/x86_64 .
@@ -68,14 +61,15 @@ docker push zapzap-backend:beta europe-west1-docker.pkg.dev/zapzap-me/zapzap-rep
 gcloud run deploy beta --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:beta
 ```
 
-## Pushing Builds (production)
+### production
+
+visible at https://api.zap-zap.me
 
 ```bash
-docker build -t zapzap-backend -f Dockerfile --platform linux/x86_64 .
-docker push zapzap-backend europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
-gcloud run deploy cloudrun-service  --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend
+docker build -t zapzap-backend:production -f Dockerfile --platform linux/x86_64 .
+docker push zapzap-backend:production europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:production
+gcloud run deploy production --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:production
 ```
-
 
 ## Database Schema Changes
 

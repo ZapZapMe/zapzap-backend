@@ -1,0 +1,58 @@
+# Run this file with
+# 
+#   export GCLOUD_CREDENTIALS_PATH=/path/to/your/application_default_credentials.json
+#   
+#   # for windows
+#   $env:GCLOUD_CREDENTIALS_PATH = "C:\path\to\your\application_default_credentials.json"
+#   
+#   docker-compose up
+#
+# this assumes the following directory structure:
+# source-code/
+# ├── zapzap-backend/
+# │   ├──  docker-compose.yaml  # (this file) for the backend and frontend
+# │   ├──  Dockerfile  # Dockerfile for the backend
+# │   └──  backend/
+# │        └── app/
+# │            ├── main.py
+# │            └── .env
+# │
+# └── zapzap-frontend/
+#     ├── public/
+#     ├── src/
+#     ├── Dockerfile  # Dockerfile for the frontend
+#     └── firebase.json
+
+services:
+
+  zapzap-frontend:
+    build:
+      context: ../zapzap-frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ../zapzap-frontend:/src
+    ports:
+      - 5000:5000
+    command: firebase emulators:start --only hosting
+
+  zapzap-backend:
+    build: .
+    ports:
+      - 8080:8080
+    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+    volumes:
+      - ./backend/app:/app
+    depends_on:
+      - cloudsql-proxy
+    env_file: "backend/app/.env"
+    environment:
+      - DB_HOST=cloudsql-proxy  # this is necessary for the backend to connect to the database through the proxy
+
+  cloudsql-proxy:
+    container_name: cloudsql-proxy
+    image: gcr.io/cloudsql-docker/gce-proxy
+    command: /cloud_sql_proxy -instances=zapzap-me:europe-west1:postgres-instance=tcp:0.0.0.0:5432 -credential_file=/secrets/cloudsql/credentials.json
+    ports:
+      - 5432:5432
+    volumes:
+      - ${GCLOUD_CREDENTIALS_PATH}:/secrets/cloudsql/credentials.json:ro

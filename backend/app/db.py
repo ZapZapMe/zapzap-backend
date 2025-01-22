@@ -1,3 +1,5 @@
+import os
+
 import pg8000
 import sqlalchemy
 from config import settings
@@ -11,27 +13,34 @@ Base = declarative_base()
 
 
 def get_engine() -> sqlalchemy.engine.base.Engine:
+    # If we're in development, use local SQLite
     if settings.ENVIRONMENT == "development":
         engine = sqlalchemy.create_engine(settings.LOCAL_DATABASE_URL)
         print("Connecting using Sqlite DB")
     else:
-        print("Connecting using Cloud DB")
-        connector = Connector()
-
-        def getconn() -> pg8000.dbapi.Connection:
-            conn: pg8000.dbapi.Connection = connector.connect(
-                settings.DB_INSTANCE_CONNECTION_NAME,
-                "pg8000",
-                user=settings.DB_USER,
-                password=settings.DB_PASS,
-                db=settings.DB_NAME,
+        db_host = os.environ.get("DB_HOST")
+        if db_host == "cloudsql-proxy":  # if we are running inside Docker Compose
+            print("DB_HOST is set; connecting via host/port instead of Cloud SQL connector.")
+            engine = sqlalchemy.create_engine(
+                f"postgresql+pg8000://{settings.DB_USER}:{settings.DB_PASS}@{db_host}:5432/{settings.DB_NAME}"
             )
-            return conn
+        else:
+            print("No DB_HOST set; using Cloud SQL connector as usual.")
+            connector = Connector()
 
-        engine = sqlalchemy.create_engine(
-            "postgresql+pg8000://",
-            creator=getconn,
-        )
+            def getconn():
+                return connector.connect(
+                    settings.DB_INSTANCE_CONNECTION_NAME,
+                    "pg8000",
+                    user=settings.DB_USER,
+                    password=settings.DB_PASS,
+                    db=settings.DB_NAME,
+                )
+
+            engine = sqlalchemy.create_engine(
+                "postgresql+pg8000://",
+                creator=getconn,
+            )
     return engine
 
 

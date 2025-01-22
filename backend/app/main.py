@@ -1,11 +1,10 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 from config import settings
 from db import (
     Base,
     engine,
 )
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes import (
     auths,
     tips,
@@ -19,16 +18,17 @@ Base.metadata.create_all(bind=engine)
 # Initialize FastAPI without the lifespan context manager
 app = FastAPI(title="ZapZap Backend")
 
+
 # On startup, connect to Breez
 @app.on_event("startup")
 def startup_event():
     connect_breez(restore_only=True)
 
+
 # Define allowed CORS origins
 origins = [
     "https://zap-zap.me",
-    "https://www.zap-zap.me",
-    "http://localhost:5000",  # Added for local development
+    "http://localhost:5000",
 ]
 
 # CORS configuration
@@ -45,9 +45,11 @@ app.include_router(users.router)
 app.include_router(auths.router)
 app.include_router(tips.router)
 
+
 @app.get("/")
 def root():
-    return {"message": "ZapZap backend is running with Greenlight!"}
+    return {"message": "Ross Ulbricht is free!"}
+
 
 @app.get("/config-check")
 def config_check():
