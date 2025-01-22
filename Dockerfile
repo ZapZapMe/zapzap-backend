@@ -1,6 +1,12 @@
 # Use an official Python runtime as the base image
 FROM python:3.12-slim
 
+# Set environment variables
+# PYTHONDONTWRITEBYTECODE Purpose: Prevents Python from writing .pyc files (compiled bytecode) to disk.
+# PYTHONUNBUFFERED        Purpose: Prevents Python from buffering stdout and stderr (it just writes them directly).
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 # Set the working directory in the container
 WORKDIR /app
 
