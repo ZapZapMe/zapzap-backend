@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import (
     auths,
+    sse,
     tips,
     users,
 )
@@ -44,6 +45,7 @@ app.add_middleware(
 app.include_router(users.router)
 app.include_router(auths.router)
 app.include_router(tips.router)
+app.include_router(sse.router)
 
 
 @app.get("/")

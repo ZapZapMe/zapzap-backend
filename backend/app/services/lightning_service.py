@@ -13,8 +13,9 @@ from breez_sdk import (
 from config import settings
 from db import SessionLocal
 from models.db import Tip, Tweet, User
-from sqlalchemy.orm import Session
+from routes.sse import connections
 from services.twitter_service import post_reply_to_twitter_with_comment
+from sqlalchemy.orm import Session
 
 # from sqlalchemy.orm import Session
 
@@ -213,6 +214,19 @@ class MyGreenlightListener(EventListener):
                 t = threading.Thread(target=forward_payment_to_receiver, args=(tip.id,))
                 t.start()
                 logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id} in LNURL.")
+            # Notify all clients subscribed to this payment hash
+            notify_clients_of_payment_status(payment_hash)
+
+
+def notify_clients_of_payment_status(payment_hash: str):
+    # Notify all clients subscribed to this payment_hash, then close their connections.
+    if payment_hash not in connections:
+        return
+    for q in connections[payment_hash]:
+        # Send the actual message
+        q.put_nowait(f"Payment received for hash: {payment_hash}")
+        # Then send the `_end_` token to terminate the SSE loop
+        q.put_nowait("_end_")
 
 
 class BreezLogger(breez_sdk.LogStream):
