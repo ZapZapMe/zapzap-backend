@@ -12,8 +12,8 @@ from sqlalchemy.orm import Session
 try:
     twitter_client = tweepy.Client(
         bearer_token=settings.TWITTER_ACCOUNT_BEARER_TOKEN,
-        consumer_key=settings.TWITTER_OAUTH2_CLIENT_ID,
-        consumer_secret=settings.TWITTER_OAUTH2_CLIENT_SECRET,
+        consumer_key=settings.TWITTER_CONSUMER_KEY,
+        consumer_secret=settings.TWITTER_CONSUMER_SECRET,
         access_token=settings.TWITTER_ACCESS_TOKEN,
         access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
     )
@@ -23,53 +23,40 @@ except Exception as e:
     twitter_client = None
 
 
-def get_user_twitter_client(user_access_token: str) -> tweepy.Client:
+def get_user_twitter_client(access_token: str, access_token_secret: str) -> tweepy.Client:
     """
-    Builds a Tweepy client for user-context OAuth2 using
-    the user's personal Twitter OAuth token (with tweet.write scope).
+    Create a Tweepy Client for user-authenticated actions (OAuth 1.0a).
     """
-    print("user_access_token", user_access_token)
     return tweepy.Client(
-        consumer_key=settings.TWITTER_OAUTH2_CLIENT_ID,
-        consumer_secret=settings.TWITTER_OAUTH2_CLIENT_SECRET,
-        access_token=user_access_token,
+        consumer_key=settings.TWITTER_CONSUMER_KEY,
+        consumer_secret=settings.TWITTER_CONSUMER_SECRET,
+        access_token=access_token,
+        access_token_secret=access_token_secret,
     )
 
 
-def post_reply_dynamic(
-    tweet_id: str,
-    reply_text: str,
-    user: User | None
-):
+def post_reply_dynamic(tweet_id: str, reply_text: str, user: User | None):
     """
-    If 'user' has twitter_access_token, post a tweet using *their* user tokens.
-    Otherwise, fallback to the global 'twitter_client' (app token).
+    Post a reply to a tweet using either the user's or the app's tokens.
     """
-    # 1) If user has an access token, build a user-scoped Tweepy client
-    if user and user.twitter_access_token:
-        logging.info(f"[post_reply_dynamic] Posting with user token: @{user.twitter_username}")
-        user_client = get_user_twitter_client(user.twitter_access_token)
+    if user and user.twitter_access_token and user.twitter_access_secret:
+        logging.info(f"[post_reply_dynamic] Posting as user @{user.twitter_username}")
+        user_client = get_user_twitter_client(user.twitter_access_token, user.twitter_access_secret)
         try:
-            response = user_client.create_tweet(
-                text=reply_text,
-                in_reply_to_tweet_id=tweet_id
-            )
-            logging.info(f"[post_reply_dynamic] User-level tweet posted. Response: {response.data}")
+            response = user_client.create_tweet(text=reply_text, in_reply_to_tweet_id=tweet_id)
+            logging.info(f"[post_reply_dynamic] User tweet posted. Response: {response.data}")
             return response.data
         except tweepy.TweepyException as e:
             logging.error(f"[post_reply_dynamic] Error posting with user token: {e}")
             raise HTTPException(status_code=400, detail=str(e))
 
-    # 2) Fallback to the global app-level client
+    # Fallback to app-level authentication
     logging.info("[post_reply_dynamic] Using global app-level twitter_client...")
     if not twitter_client:
         raise HTTPException(status_code=400, detail="Global Twitter client not initialized.")
 
     try:
-        response = twitter_client.create_tweet(
-            text=reply_text,
-            in_reply_to_tweet_id=tweet_id
-        )
+        response = twitter_client.create_tweet(text=reply_text, in_reply_to_tweet_id=tweet_id)
         logging.info(f"[post_reply_dynamic] App-level tweet posted. Response: {response.data}")
         return response.data
     except tweepy.TweepyException as e:
@@ -116,7 +103,7 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip, user: User | None 
     tweet_author_user = tip.tweet.author
     mention_text = f"@{tweet_author_user.twitter_username}" if tweet_author_user else "someone"
 
-    reply_text = f"{mention_text}, your tip is paid!\n{comment}\n#ZapZap"
+    reply_text = f"{mention_text}, your tip is paid by some!\n{comment}\n#ZapZap"
 
     # Call our new dynamic function
     response_data = post_reply_dynamic(tweet_id_str, reply_text, user)

@@ -22,7 +22,7 @@ class User(Base):
     twitter_username: Mapped[str] = mapped_column(index=True, unique=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(nullable=True)
     twitter_access_token: Mapped[Optional[str]] = mapped_column(nullable=True)
-    twitter_refresh_token: Mapped[Optional[str]] = mapped_column(nullable=True)
+    twitter_access_secret: Mapped[Optional[str]] = mapped_column(nullable=True)
     avatar_updated_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     wallet_address: Mapped[Optional[str]] = mapped_column(nullable=True, index=True)
     is_admin: Mapped[bool] = mapped_column(default=False)
