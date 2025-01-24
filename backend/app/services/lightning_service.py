@@ -17,8 +17,8 @@ from routes.sse import connections
 from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
 
-# from sqlalchemy.orm import Session
-
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.getLogger().setLevel(logging.INFO)
 
 # Optional: define a global variable for 'sdk_services'
 sdk_services = None
@@ -44,11 +44,18 @@ def send_bolt12_payment(bolt12_offer: str, amount_sats: int):
     #     return None
 
 
+def calculate_amount_to_send_sats(amount_sats: int):
+    # fees are defined as 4 sats + 0.05% of the amount.
+    # Given an amount, we need to subtract the fees to get the actual amount to send.
+    fees = 4 + (amount_sats * 0.005)
+    return int(amount_sats - fees)
+
+
 def send_lnurl_payment(lnurl_address: str, amount_sats: int):
     try:
         parsed_input = breez_sdk.parse_input(lnurl_address)
         if isinstance(parsed_input, breez_sdk.InputType.LN_URL_PAY):
-            amount_msat = amount_sats * 1000
+            amount_msat = calculate_amount_to_send_sats(amount_sats) * 1000
             use_trampoline = True
             comment = "test"
 
@@ -103,7 +110,7 @@ def forward_payment_to_receiver(tip_id: int):
             logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
             try:
                 print("The tip sender is ", tip.sender)
-                post_reply_to_twitter_with_comment(db, tip, user=tip.sender)
+                # post_reply_to_twitter_with_comment(db, tip, user=tip.sender)
             except Exception as e:
                 logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
             return payment_hash
