@@ -25,6 +25,18 @@
 
 services:
 
+  # new website
+  zapzap-web:
+    build:
+      context: ../zapzap-web
+      dockerfile: Dockerfile
+    volumes:
+      - ../zapzap-web:/src
+    ports:
+      - 4200:4200
+    command: ng serve
+
+  # old website
   zapzap-frontend:
     build:
       context: ../zapzap-frontend
