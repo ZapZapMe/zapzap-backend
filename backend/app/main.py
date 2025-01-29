@@ -30,6 +30,7 @@ def startup_event():
 origins = [
     "https://zap-zap.me",
     "http://localhost:5000",
+    "http://localhost:3000",
 ]
 
 # CORS configuration
