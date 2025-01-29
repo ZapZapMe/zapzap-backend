@@ -9,6 +9,7 @@ from schemas.user import (
     UserUpdate,
 )
 from services.lightning_service import forward_pending_tips_for_user
+from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy.orm import Session
 from utils.security import get_current_user
 
@@ -17,15 +18,14 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("/me", response_model=UserOut)
 def read_users_me(current_user: User = Depends(get_current_user)):
+    current_user.avatar_url = get_avatars_for_usernames([current_user.twitter_username])
     return current_user
 
 
 @router.put("/me", response_model=UserOut)
 def update_user_profile(
-    user_update: UserUpdate, db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    
     user = db.query(User).filter(User.twitter_username == current_user).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found!")

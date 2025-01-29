@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
+from pydantic.networks import HttpUrl
 
 
 class UserCreate(BaseModel):
@@ -23,6 +24,7 @@ class UserOut(BaseModel):
     wallet_address: Optional[str]
     is_admin: bool
     is_registered: bool
+    avatar_url: Optional[HttpUrl] = None
 
     class Config:
         orm_mode = True
