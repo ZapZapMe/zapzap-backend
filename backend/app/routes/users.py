@@ -17,8 +17,11 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/me", response_model=UserOut)
-def read_users_me(current_user: User = Depends(get_current_user)):
-    current_user.avatar_url = get_avatars_for_usernames([current_user.twitter_username])
+def read_users_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    result_dic = get_avatars_for_usernames([current_user.twitter_username], db)
+    normalized = current_user.twitter_username.lower()
+    avatar_url = result_dic.get(normalized, None)
+    current_user.avatar_url = avatar_url
     return current_user
 
 
