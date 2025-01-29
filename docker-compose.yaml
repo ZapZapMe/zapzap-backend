@@ -25,7 +25,6 @@
 
 services:
 
-  # new website
   zapzap-web:
     build:
       context: ../zapzap-web
@@ -33,25 +32,12 @@ services:
     volumes:
       - ../zapzap-web:/src
     ports:
-      - 4200:4200
-    command: ng serve
-
-  # old website
-  zapzap-frontend:
-    build:
-      context: ../zapzap-frontend
-      dockerfile: Dockerfile
-    volumes:
-      - ../zapzap-frontend:/src
-    ports:
-      - 5000:5000
-    command: firebase emulators:start --only hosting
+      - 3000:3000
 
   zapzap-backend:
     build: .
     ports:
       - 8080:8080
-    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
     volumes:
       - ./backend/app:/app
     depends_on:
@@ -59,12 +45,13 @@ services:
     env_file: "backend/app/.env"
     environment:
       - DB_HOST=cloudsql-proxy  # this is necessary for the backend to connect to the database through the proxy
+    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
   cloudsql-proxy:
     container_name: cloudsql-proxy
     image: gcr.io/cloudsql-docker/gce-proxy
-    command: /cloud_sql_proxy -instances=zapzap-me:europe-west1:postgres-instance=tcp:0.0.0.0:5432 -credential_file=/secrets/cloudsql/credentials.json
     ports:
       - 5432:5432
     volumes:
       - ${GCLOUD_CREDENTIALS_PATH}:/secrets/cloudsql/credentials.json:ro
+    command: /cloud_sql_proxy -instances=zapzap-me:europe-west1:postgres-instance=tcp:0.0.0.0:5432 -credential_file=/secrets/cloudsql/credentials.json
