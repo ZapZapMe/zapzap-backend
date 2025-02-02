@@ -17,10 +17,11 @@ from utils.twitter_oauth import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
 @router.get("/twitter/login")
 def twitter_login():
     print("Twitter redirect URL", settings.TWITTER_REDIRECT_URI)
-    callback_uri = "http://localhost:8080/auth/twitter/callback"
+    callback_uri = settings.TWITTER_REDIRECT_URI
     """Step 1: Redirect user to Twitter for authorization."""
     auth = tweepy.OAuth1UserHandler(
         settings.TWITTER_CONSUMER_KEY,
