@@ -223,7 +223,8 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
             created_at=tip.created_at,
             tweet_id=tip.tweet_id,
             avatar_url=avatars_map.get(tip.recipient),
-            comment=tip.comment
+            comment=tip.comment,
+            tip_type="sent",
         )
         for tip in tips
     ]
@@ -255,7 +256,8 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
             tweet_id=tip.tweet_id,
             recipient=username,
             avatar_url=avatars_map.get(tip.sender.twitter_username) if tip.sender else None,
-            comment=tip.comment
+            comment=tip.comment,
+            tip_type="received",
         ) 
         for tip in tips
     ]

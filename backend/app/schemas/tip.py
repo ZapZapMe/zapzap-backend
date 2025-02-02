@@ -61,6 +61,7 @@ class TipSummary(BaseModel):
     recipient: str
     avatar_url: Optional[str] = None
     comment: Optional[str] = None
+    tip_type: str
 
     class Config:
         orm_mode = True

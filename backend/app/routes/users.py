@@ -28,7 +28,7 @@ def read_users_me(db: Session = Depends(get_db), current_user: User = Depends(ge
 def update_user_profile(
     user_update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    user = db.query(User).filter(User.twitter_username == current_user).first()
+    user = db.query(User).filter(User.twitter_username == current_user.twitter_username).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found!")
 
