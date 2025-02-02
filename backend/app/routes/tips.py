@@ -284,5 +284,22 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.twitter_username == username).first()
     if not user:
         raise HTTPException(status_code=400, detail="User not found.")
-    tips = db.query(Tip).join(Tweet, Tweet.id == Tip.tweet_id).filter(Tweet.tweet_author == user.id).all()
-    return [TipOut.from_orm(tip) for tip in tips]
+    
+    tips = (
+        db.query(Tip)
+        .join(Tweet, Tweet.id == Tip.tweet_id)
+        .join(User, User.id == Tweet.tweet_author)
+        .filter(Tweet.tweet_author == user.id)
+        .all()
+    )
+    
+    return [
+        TipSummary(
+            tip_sender=tip.sender.twitter_username if tip.sender else None,
+            amount_sats=tip.amount_sats,
+            created_at=tip.created_at,
+            tweet_id=tip.tweet_id,
+            recipient=username
+        ) 
+        for tip in tips
+    ]
