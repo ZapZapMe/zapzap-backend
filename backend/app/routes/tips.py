@@ -210,6 +210,10 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
         .all()
     )
 
+    recipient_usernames = [tip.recipient for tip in tips]
+    
+    avatars_map = get_avatars_for_usernames(recipient_usernames, db)
+
     return [
         TipSummary(
             tip_sender=tip.tip_sender,
@@ -217,6 +221,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
             amount_sats=tip.amount_sats,
             created_at=tip.created_at,
             tweet_id=tip.tweet_id,
+            avatar_url=avatars_map.get(tip.recipient)
         )
         for tip in tips
     ]
@@ -292,6 +297,10 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
         .filter(Tweet.tweet_author == user.id)
         .all()
     )
+
+    sender_usernames = [tip.sender.twitter_username for tip in tips if tip.sender is not None]
+    
+    avatars_map = get_avatars_for_usernames(sender_usernames, db)
     
     return [
         TipSummary(
@@ -299,7 +308,8 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
             amount_sats=tip.amount_sats,
             created_at=tip.created_at,
             tweet_id=tip.tweet_id,
-            recipient=username
+            recipient=username,
+            avatar_url=avatars_map.get(tip.sender.twitter_username) if tip.sender else None
         ) 
         for tip in tips
     ]

@@ -59,6 +59,7 @@ class TipSummary(BaseModel):
     created_at: datetime
     tweet_id: int
     recipient: str
+    avatar_url: Optional[str] = None
 
     class Config:
         orm_mode = True
