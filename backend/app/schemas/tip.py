@@ -71,3 +71,4 @@ class TipInvoice(BaseModel):
     tip_recipient: str
     amount_sats: int
     bolt11_invoice: str
+    payment_hash: str

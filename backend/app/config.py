@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_SECONDS: int = 3600
+    JWT_ACCESS_TOKEN_EXPIRE_SECONDS: int = 2592000
 
     BREEZ_API_KEY: str
     BREEZ_MNEMONIC: str

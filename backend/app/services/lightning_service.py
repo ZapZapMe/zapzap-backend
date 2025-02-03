@@ -1,6 +1,6 @@
 import logging
 import threading
-
+import json
 import breez_sdk
 from breez_sdk import (
     ConnectRequest,
@@ -230,10 +230,15 @@ def notify_clients_of_payment_status(payment_hash: str):
     if payment_hash not in connections:
         return
     for q in connections[payment_hash]:
+        # Create a properly formatted JSON message
+        message = json.dumps({
+            "payment_hash": payment_hash,
+            "status": "paid",
+            "message": "Payment received successfully."
+        })
+        
         # Send the actual message
-        q.put_nowait(f"Payment received for hash: {payment_hash}")
-        # Then send the `_end_` token to terminate the SSE loop
-        q.put_nowait("_end_")
+        q.put_nowait(message)
 
 
 class BreezLogger(breez_sdk.LogStream):
