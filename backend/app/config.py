@@ -46,8 +46,8 @@ class Settings(BaseSettings):
     # Application settings
     LEADERBOARD_CALCULATION_WINDOW_DAYS: int = 30  # a value in .env would override this
     TWITTER_AVATAR_CACHE_TTL_DAYS: int = 30
-
-    FRONTEND_URL: str = "http://localhost:3000/"
+    BREEZ_LOGLEVEL: str = "INFO"
+    FRONTEND_URL: str = "http://127.0.0.1:3000"
 
     class Config:
         env_file = "backend/app/.env"
