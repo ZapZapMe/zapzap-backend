@@ -7,6 +7,7 @@ from schemas.user import (
     UserCreate,
     UserOut,
     UserUpdate,
+    UserLimitedOut
 )
 from services.lightning_service import forward_pending_tips_for_user
 from services.twitter_service import get_avatars_for_usernames
@@ -65,3 +66,22 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return new_user
+
+
+@router.get("/{username}", response_model=UserLimitedOut)
+def get_user_by_username(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.twitter_username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    result_dic = get_avatars_for_usernames([username], db)
+    avatar_url = result_dic.get(username, None)
+    
+    user_data = {
+        "twitter_username": user.twitter_username,
+        "wallet_address": user.wallet_address,
+        "avatar_url": avatar_url,
+        "twitter_link": f"https://x.com/{user.twitter_username}"
+    }
+    
+    return user_data

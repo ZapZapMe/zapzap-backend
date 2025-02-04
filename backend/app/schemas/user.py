@@ -28,3 +28,12 @@ class UserOut(BaseModel):
 
     class Config:
         orm_mode = True
+
+class UserLimitedOut(BaseModel):
+    twitter_username: str
+    wallet_address: str | None
+    avatar_url: str | None
+    twitter_link: str | None
+
+    class Config:
+        from_attributes = True
