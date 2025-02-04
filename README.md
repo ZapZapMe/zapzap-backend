@@ -33,12 +33,6 @@ gcloud config set run/region europe-west1
 gcloud auth configure-docker europe-west1-docker.pkg.dev
 ```
 
-
-
-
-
-
-
 ## Running via Docker Compose (recommended)
 
 export GCLOUD_CREDENTIALS_PATH=/path/to/your/application_default_credentials.json # windows: $env:GCLOUD_CREDENTIALS_PATH = "C:\path\to\your\application_default_credentials.json"
@@ -60,6 +54,11 @@ docker build --tag zapzap-backend:beta  -f Dockerfile --platform linux/x86_64 .
 docker push zapzap-backend:beta europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:beta
 gcloud run deploy beta --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:beta
 ```
+
+Additionally any commits to the `beta` branch:
+- trigger [cloud build for `beta`](https://console.cloud.google.com/cloud-build/builds;region=europe-west1) 
+- deploy to [the cloud run instance for `beta`](https://console.cloud.google.com/run/detail/europe-west1/beta) 
+- and are avaliable on https://api-beta.zap-zap.me
 
 ### production
 
