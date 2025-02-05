@@ -13,6 +13,7 @@ from services.lightning_service import forward_pending_tips_for_user
 from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy.orm import Session
 from utils.security import get_current_user
+from sqlalchemy import func
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -70,7 +71,8 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.get("/{username}", response_model=UserLimitedOut)
 def get_user_by_username(username: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.twitter_username == username).first()
+    print("=======> ", username)
+    user = db.query(User).filter(func.lower(User.twitter_username) == username.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
