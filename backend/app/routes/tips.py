@@ -190,7 +190,7 @@ def get_tip(tip_id: int, db: Session = Depends(get_db)):
 
 @router.get("/sent/{username}", response_model=list[TipSummary])
 def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.twitter_username == username).first()
+    user = db.query(User).filter(func.lower(User.twitter_username) == username.lower()).first()
     if not user:
         raise HTTPException(status_code=400, detail="User not found.")
 
@@ -232,7 +232,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
 
 @router.get("/received/{username}", response_model=list[TipSummary])
 def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.twitter_username == username).first()
+    user = db.query(User).filter(func.lower(User.twitter_username) == username.lower()).first()
     if not user:
         raise HTTPException(status_code=400, detail="User not found.")
     

@@ -71,13 +71,13 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.get("/{username}", response_model=UserLimitedOut)
 def get_user_by_username(username: str, db: Session = Depends(get_db)):
-    print("=======> ", username)
     user = db.query(User).filter(func.lower(User.twitter_username) == username.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    result_dic = get_avatars_for_usernames([username], db)
-    avatar_url = result_dic.get(username, None)
+    # Use the user's actual Twitter username from the database for consistency
+    result_dic = get_avatars_for_usernames([user.twitter_username], db)
+    avatar_url = result_dic.get(user.twitter_username, None)
     
     user_data = {
         "twitter_username": user.twitter_username,
