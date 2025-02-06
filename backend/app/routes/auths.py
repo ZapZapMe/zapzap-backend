@@ -98,5 +98,5 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)
     token = create_access_token(data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires)
 
-    redirect_url = f"{settings.FRONTEND_URL}?token={token}"
-    return RedirectResponse(url=redirect_url)
+    return RedirectResponse(url=f"/?token={token}")
+
