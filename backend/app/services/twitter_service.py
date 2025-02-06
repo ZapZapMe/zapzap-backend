@@ -11,13 +11,14 @@ from sqlalchemy.orm import Session
 
 try:
     twitter_client = tweepy.Client(
-        bearer_token=settings.TWITTER_ACCOUNT_BEARER_TOKEN,
+        # bearer_token=settings.TWITTER_ACCOUNT_BEARER_TOKEN,
         consumer_key=settings.TWITTER_CONSUMER_KEY,
         consumer_secret=settings.TWITTER_CONSUMER_SECRET,
         access_token=settings.TWITTER_ACCESS_TOKEN,
         access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
     )
-    logging.info("Initialized Twitter client successfully...")
+    me = twitter_client.get_me()
+    logging.info(f"Initialized Twitter client successfully as @{me.data.username}")
 except Exception as e:
     logging.error(f"Failed to initialize Tweepy client: {e}")
     twitter_client = None
@@ -50,7 +51,7 @@ def post_reply_dynamic(tweet_id: str, reply_text: str):
     except tweepy.TweepyException as e:
         logging.error(f"[post_reply_dynamic] Error posting with app token: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    
+
 
 def post_reply_with_tweepy(tweet_id: str, reply_text: str):
     """
@@ -73,6 +74,7 @@ def post_reply_with_tweepy(tweet_id: str, reply_text: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+
 def post_reply_to_twitter_with_comment(db: Session, tip: Tip):
     """
     High-level function that:
@@ -85,15 +87,22 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip):
 
     tweet_id_str = str(tip.tweet_id)
     comment = tip.comment or "No comment"
-
+    
+    # Get the recipient username
     tweet_author_user = tip.tweet.author
-    mention_text = f"@{tweet_author_user.twitter_username}" if tweet_author_user else "someone"
+    recipient = f"@{tweet_author_user.twitter_username}" if tweet_author_user else "someone"
+    
+    # Get the tipper username
+    tipper = "@Anonymous"
+    if tip.sender and tip.sender.twitter_username:
+        tipper = f"@{tip.sender.twitter_username}"
+    
+    # Format with lightning emojis and amount
+    reply_text = f"⚡{comment}⚡ {tipper} tipped you {tip.amount_sats} sats."
 
-    reply_text = f"{mention_text}, your tip is paid by some!\n{comment}\n#ZapZap"
-
-    # Call simplified dynamic function
     response_data = post_reply_dynamic(tweet_id_str, reply_text)
     logging.info(f"[post_reply_to_twitter_with_comment] Response: {response_data}")
+
 
 def get_avatars_for_usernames(
     usernames: List[str],

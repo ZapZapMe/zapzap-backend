@@ -33,6 +33,7 @@ origins = [
     "http://localhost:3000",
     "https://beta.zap-zap.me",
     "https://prod.zap-zap.me",
+    "https://zap-zap.me",
 ]
 
 # CORS configuration
