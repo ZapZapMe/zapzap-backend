@@ -93,7 +93,7 @@ def forward_payment_to_receiver(tip_id: int):
             return None
 
         receiver = tip.tweet.author
-        post_reply_to_twitter_with_comment(db, tip, user=tip.sender)
+        post_reply_to_twitter_with_comment(db, tip)
 
         if not receiver or not receiver.wallet_address:
             logging.error(f"Receiver @{receiver.twitter_username} not found or does not have wallet address.")
