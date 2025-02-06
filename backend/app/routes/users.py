@@ -7,11 +7,13 @@ from schemas.user import (
     UserCreate,
     UserOut,
     UserUpdate,
+    UserLimitedOut
 )
 from services.lightning_service import forward_pending_tips_for_user
 from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy.orm import Session
 from utils.security import get_current_user
+from sqlalchemy import func
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -19,8 +21,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("/me", response_model=UserOut)
 def read_users_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     result_dic = get_avatars_for_usernames([current_user.twitter_username], db)
-    normalized = current_user.twitter_username.lower()
-    avatar_url = result_dic.get(normalized, None)
+    avatar_url = result_dic.get(current_user.twitter_username, None)
     current_user.avatar_url = avatar_url
     return current_user
 
@@ -29,7 +30,7 @@ def read_users_me(db: Session = Depends(get_db), current_user: User = Depends(ge
 def update_user_profile(
     user_update: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
-    user = db.query(User).filter(User.twitter_username == current_user).first()
+    user = db.query(User).filter(User.twitter_username == current_user.twitter_username).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found!")
 
@@ -66,3 +67,23 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return new_user
+
+
+@router.get("/{username}", response_model=UserLimitedOut)
+def get_user_by_username(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(func.lower(User.twitter_username) == username.lower()).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Use the user's actual Twitter username from the database for consistency
+    result_dic = get_avatars_for_usernames([user.twitter_username], db)
+    avatar_url = result_dic.get(user.twitter_username, None)
+    
+    user_data = {
+        "twitter_username": user.twitter_username,
+        "wallet_address": user.wallet_address,
+        "avatar_url": avatar_url,
+        "twitter_link": f"https://x.com/{user.twitter_username}"
+    }
+    
+    return user_data

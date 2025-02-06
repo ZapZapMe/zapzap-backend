@@ -59,6 +59,9 @@ class TipSummary(BaseModel):
     created_at: datetime
     tweet_id: int
     recipient: str
+    avatar_url: Optional[str] = None
+    comment: Optional[str] = None
+    tip_type: str
 
     class Config:
         orm_mode = True
@@ -68,3 +71,4 @@ class TipInvoice(BaseModel):
     tip_recipient: str
     amount_sats: int
     bolt11_invoice: str
+    payment_hash: str

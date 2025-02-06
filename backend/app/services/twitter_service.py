@@ -2,7 +2,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
-
+from sqlalchemy import func
 import tweepy
 from config import settings
 from fastapi import HTTPException
@@ -114,26 +114,23 @@ def get_avatars_for_usernames(
     usernames: List[str],
     db: Session,
 ) -> Dict[str, str]:
-    """
-    Returns a dict of {username: avatar_url}.
-    Fetches from DB if still valid (less than refresh_interval_weeks old),
-    otherwise calls Twitter API and updates DB.
-    """
     cutoff = datetime.now() - timedelta(weeks=settings.TWITTER_AVATAR_CACHE_TTL_DAYS)
+    
     # Fetch existing users from DB
-    existing_users = db.query(User).filter(User.twitter_username.in_(usernames)).all()
-    user_map = {u.twitter_username.lower(): u for u in existing_users}
+    existing_users = db.query(User).filter(func.lower(User.twitter_username).in_([u.lower() for u in usernames])).all()
+    user_map = {u.twitter_username: u for u in existing_users}  # Use original case as key
 
     # Separate who needs a refresh
     needs_refresh = [
         u.twitter_username for u in existing_users if not u.avatar_updated_at or u.avatar_updated_at < cutoff
     ]
-    # Find any usernames not in DB yet
-    missing = [uname for uname in usernames if uname.lower() not in user_map]
+    
+    # Find any usernames not in DB yet (case-insensitive check)
+    existing_usernames_lower = {u.twitter_username.lower() for u in existing_users}
+    missing = [uname for uname in usernames if uname.lower() not in existing_usernames_lower]
 
     to_update = list(set(needs_refresh + missing))
     result = {}
-
     # Fetch fresh data from Twitter for those who need it
     if to_update:
         try:
@@ -159,7 +156,7 @@ def get_avatars_for_usernames(
             logging.error(f"Error calling Twitter API: {e}")
 
     # Build final result from updated DB state
-    for uname, user_obj in user_map.items():
-        result[uname] = user_obj.avatar_url or ""
+    for user_obj in existing_users:
+        result[user_obj.twitter_username] = user_obj.avatar_url or ""
 
-    return {u: result.get(u.lower(), "") for u in usernames}
+    return result

@@ -1,6 +1,6 @@
 import logging
 import threading
-
+import json
 import breez_sdk
 from breez_sdk import (
     ConnectRequest,
@@ -93,6 +93,8 @@ def forward_payment_to_receiver(tip_id: int):
             return None
 
         receiver = tip.tweet.author
+        post_reply_to_twitter_with_comment(db, tip, user=tip.sender)
+
         if not receiver or not receiver.wallet_address:
             logging.error(f"Receiver @{receiver.twitter_username} not found or does not have wallet address.")
             return None
@@ -110,7 +112,6 @@ def forward_payment_to_receiver(tip_id: int):
             logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
             try:
                 print("The tip sender is ", tip.sender)
-                # post_reply_to_twitter_with_comment(db, tip, user=tip.sender)
             except Exception as e:
                 logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
             return payment_hash
@@ -230,10 +231,15 @@ def notify_clients_of_payment_status(payment_hash: str):
     if payment_hash not in connections:
         return
     for q in connections[payment_hash]:
+        # Create a properly formatted JSON message
+        message = json.dumps({
+            "payment_hash": payment_hash,
+            "status": "paid",
+            "message": "Payment received successfully."
+        })
+        
         # Send the actual message
-        q.put_nowait(f"Payment received for hash: {payment_hash}")
-        # Then send the `_end_` token to terminate the SSE loop
-        q.put_nowait("_end_")
+        q.put_nowait(message)
 
 
 class BreezLogger(breez_sdk.LogStream):
