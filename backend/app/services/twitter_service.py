@@ -35,23 +35,11 @@ def get_user_twitter_client(access_token: str, access_token_secret: str) -> twee
     )
 
 
-def post_reply_dynamic(tweet_id: str, reply_text: str, user: User | None):
+def post_reply_dynamic(tweet_id: str, reply_text: str):
     """
-    Post a reply to a tweet using either the user's or the app's tokens.
+    Post a reply to a tweet using the app's tokens.
     """
-    if user and user.twitter_access_token and user.twitter_access_secret:
-        logging.info(f"[post_reply_dynamic] Posting as user @{user.twitter_username}")
-        user_client = get_user_twitter_client(user.twitter_access_token, user.twitter_access_secret)
-        try:
-            response = user_client.create_tweet(text=reply_text, in_reply_to_tweet_id=tweet_id)
-            logging.info(f"[post_reply_dynamic] User tweet posted. Response: {response.data}")
-            return response.data
-        except tweepy.TweepyException as e:
-            logging.error(f"[post_reply_dynamic] Error posting with user token: {e}")
-            raise HTTPException(status_code=400, detail=str(e))
-
-    # Fallback to app-level authentication
-    logging.info("[post_reply_dynamic] Using global app-level twitter_client...")
+    logging.info("[post_reply_dynamic] Using app-level twitter_client...")
     if not twitter_client:
         raise HTTPException(status_code=400, detail="Global Twitter client not initialized.")
 
@@ -62,9 +50,7 @@ def post_reply_dynamic(tweet_id: str, reply_text: str, user: User | None):
     except tweepy.TweepyException as e:
         logging.error(f"[post_reply_dynamic] Error posting with app token: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-
-
-
+    
 
 def post_reply_with_tweepy(tweet_id: str, reply_text: str):
     """
@@ -87,11 +73,11 @@ def post_reply_with_tweepy(tweet_id: str, reply_text: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-def post_reply_to_twitter_with_comment(db: Session, tip: Tip, user: User | None = None):
+def post_reply_to_twitter_with_comment(db: Session, tip: Tip):
     """
     High-level function that:
       1) Builds the reply text from 'tip'
-      2) Calls 'post_reply_dynamic' to decide whether to use user tokens or app tokens.
+      2) Posts reply using app tokens
     """
     if not tip.tweet:
         logging.warning(f"Tweet {tip.tweet_id} not found. Skipping reply.")
@@ -105,10 +91,9 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip, user: User | None 
 
     reply_text = f"{mention_text}, your tip is paid by some!\n{comment}\n#ZapZap"
 
-    # Call our new dynamic function
-    response_data = post_reply_dynamic(tweet_id_str, reply_text, user)
+    # Call simplified dynamic function
+    response_data = post_reply_dynamic(tweet_id_str, reply_text)
     logging.info(f"[post_reply_to_twitter_with_comment] Response: {response_data}")
-
 
 def get_avatars_for_usernames(
     usernames: List[str],
