@@ -23,7 +23,6 @@ User2 = aliased(User)
 def get_most_tipped_users(db: Session = Depends(get_db)):
     timerange = datetime.now(timezone.utc) - timedelta(days=settings.LEADERBOARD_CALCULATION_WINDOW_DAYS)
 
-    # Label the columns to match the fields in LeaderboardReceived
     tips = (
         db.query(
             User.twitter_username.label("tip_recipient"),
@@ -43,13 +42,10 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
-    # Get the usernames from the query results
     usernames = [t.tip_recipient for t in tips]
 
-    # Get avatars in one batch call
     avatars_map = get_avatars_for_usernames(usernames, db)
 
-    # Build the final response
     result = []
     for t in tips:
         avatar_url = avatars_map.get(t.tip_recipient) or ""
@@ -87,13 +83,10 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
-    # Get the usernames from the query results
     usernames = [t.tip_sender for t in tips]
 
-    # Get avatars in one batch call
     avatars_map = get_avatars_for_usernames(usernames, db)
 
-    # Build the response
     result = []
     for t in tips:
         avatar_url = avatars_map.get(t.tip_sender) or ""
@@ -102,7 +95,7 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
                 tip_sender=t.tip_sender,
                 total_amount_sats=t.total_amount_sats,
                 tip_count=t.tip_count,
-                avatar_url=avatar_url,  # Add avatar URL to your schema if needed
+                avatar_url=avatar_url,
             )
         )
 
@@ -127,7 +120,6 @@ def create_tip(
                 receiver = User(twitter_username=username, is_registered=False)
                 db.add(receiver)
                 db.flush()
-
             else:
                 if not receiver.wallet_address:
                     logging.warning(
@@ -146,8 +138,6 @@ def create_tip(
             f"⚡⚡ for https://x.com/{username}/status/{tweet_id}",
         )
 
-        tip_sender_id = None
-
         new_tip = Tip(
             tip_sender=current_user.id,
             tweet_id=tweet_id,
@@ -163,9 +153,12 @@ def create_tip(
         logging.info(f"New tip created: {new_tip.id} for tweet {tweet_id}")
         print("BOLT11: ", bolt11_invoice)
 
-        return TipInvoice(tip_recipient=username, amount_sats=new_tip.amount_sats, bolt11_invoice=bolt11_invoice, payment_hash=payment_hash)
-
-        return new_tip
+        return TipInvoice(
+            tip_recipient=username,
+            amount_sats=new_tip.amount_sats,
+            bolt11_invoice=bolt11_invoice,
+            payment_hash=payment_hash,
+        )
 
     except HTTPException as http_exc:
         logging.error(f"HTTP error occurred: {http_exc.detail}")
@@ -177,7 +170,8 @@ def create_tip(
 
 @router.get("/", response_model=list[TipOut])
 def list_tips(db: Session = Depends(get_db)):
-    return db.query(Tip).all()
+    # Order tips from new to old
+    return db.query(Tip).order_by(Tip.created_at.desc()).all()
 
 
 @router.get("/{tip_id}", response_model=TipOut)
@@ -202,17 +196,17 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
             Tip.tweet_id,
             Tweet.id.label("tweet_id"),
             User2.twitter_username.label("recipient"),
-            Tip.comment,  # Adding comment to the query
+            Tip.comment,  # Including comment in the query
         )
         .join(User, User.id == Tip.tip_sender)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User2, User2.id == Tweet.tweet_author)
         .filter(Tip.tip_sender == user.id)
+        .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )
 
     recipient_usernames = [tip.recipient for tip in tips]
-    
     avatars_map = get_avatars_for_usernames(recipient_usernames, db)
 
     return [
@@ -241,11 +235,11 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User, User.id == Tweet.tweet_author)
         .filter(Tweet.tweet_author == user.id)
+        .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )
 
     sender_usernames = [tip.sender.twitter_username for tip in tips if tip.sender is not None]
-    
     avatars_map = get_avatars_for_usernames(sender_usernames, db)
     
     return [
@@ -258,6 +252,6 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
             avatar_url=avatars_map.get(tip.sender.twitter_username) if tip.sender else None,
             comment=tip.comment,
             tip_type="received",
-        ) 
+        )
         for tip in tips
     ]
