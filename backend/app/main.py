@@ -29,11 +29,8 @@ def startup_event():
 # Define allowed CORS origins
 origins = [
     "https://zap-zap.me",
-    "http://localhost:5000",
     "http://localhost:3000",
     "https://beta.zap-zap.me",
-    "https://prod.zap-zap.me",
-    "https://zap-zap.me",
 ]
 
 # CORS configuration
