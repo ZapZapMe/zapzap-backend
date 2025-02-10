@@ -1,6 +1,6 @@
 import logging
 from datetime import timedelta
-import tweepy
+
 from config import settings
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -20,66 +20,36 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.get("/twitter/login")
 def twitter_login():
-    print("Twitter redirect URL", settings.TWITTER_REDIRECT_URI)
-    callback_uri = settings.TWITTER_REDIRECT_URI
-    """Step 1: Redirect user to Twitter for authorization."""
-    auth = tweepy.OAuth1UserHandler(
-        settings.TWITTER_CONSUMER_KEY,
-        settings.TWITTER_CONSUMER_SECRET,
-        callback=callback_uri,
-    )
-
-    try:
-        redirect_url = auth.get_authorization_url()
-        logging.info(f"Redirecting user to Twitter: {redirect_url}")
-        print("redirect_url", redirect_url)
-        return {"authorization_url": redirect_url}
-    except tweepy.TweepyException as e:
-        logging.error(f"Error getting authorization URL: {e}")
-        return {"error": "Failed to get Twitter authorization URL"}
+    url = get_authorization_url()
+    logging.info("Redirecting user to Twitter for authentication")
+    return {"authorization_url": url}
 
 
-@router.get("/twitter/callback")
+@router.get("/twitter/callback", response_model=Token)
 async def twitter_callback(request: Request, db: Session = Depends(get_db)):
-    """Step 2: Exchange OAuth verifier for user tokens."""
-    oauth_token = request.query_params.get("oauth_token")
-    oauth_verifier = request.query_params.get("oauth_verifier")
+    code = request.query_params.get("code")
+    # state = request.query_params.get("state")
+    if not code:
+        logging.info("Authentication failed: No code provided.")
+        raise HTTPException(status_code=400, detail="Code not provided")
 
-    if not oauth_token or not oauth_verifier:
-        logging.error("Missing oauth_token or oauth_verifier")
-        raise HTTPException(status_code=400, detail="Missing required OAuth parameters")
-
-    auth = tweepy.OAuth1UserHandler(
-        settings.TWITTER_CONSUMER_KEY,
-        settings.TWITTER_CONSUMER_SECRET,
-        settings.TWITTER_REDIRECT_URI,
-    )
-
-    auth.request_token = {"oauth_token": oauth_token, "oauth_token_secret": oauth_verifier}
-
+    # Exchange code for token (OAuth 2.0 flow)
     try:
-        access_token, access_token_secret = auth.get_access_token(oauth_verifier)
-    except tweepy.TweepyException as e:
-        logging.error(f"Failed to exchange token: {e}")
-        raise HTTPException(status_code=400, detail="Failed to exchange token")
-
-    # Fetch user info using the access token
-    user_client = tweepy.Client(
-        consumer_key=settings.TWITTER_CONSUMER_KEY,
-        consumer_secret=settings.TWITTER_CONSUMER_SECRET,
-        access_token=access_token,
-        access_token_secret=access_token_secret,
-    )
-
-    try:
-        user_info = user_client.get_me(user_fields=["id", "username"])
-        twitter_id = user_info.data.id
-        twitter_username = user_info.data.username
+        token_response = await exchange_code_for_token(code)
     except Exception as e:
-        logging.error(f"Failed to fetch user info: {e}")
-        raise HTTPException(status_code=400, detail="Failed to fetch Twitter user info")
+        logging.error(f"Token exchange failed: {e}")
+        raise HTTPException(status_code=400, detail="Failed to exchange code for token")
 
-    # Store user tokens in database
+    access_token = token_response.get("access_token")
+    if not access_token:
+        logging.error("No access token returned from the token exchange")
+        raise HTTPException(status_code=400, detail="No access token returned")
+
+    # Get user info
+    user_info = await get_twitter_user_info(access_token)
+    # twitter_id = user_info["data"]["id"]
+    twitter_username = user_info["data"]["username"]
+
     user = db.query(User).filter(User.twitter_username == twitter_username).first()
 
     if not user:
@@ -88,13 +58,9 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     else:
         user.is_registered = True
 
-    user.twitter_access_token = access_token
-    user.twitter_access_secret = access_token_secret  # ✅ Store access_token_secret
-
     db.commit()
     db.refresh(user)
 
-    # Generate JWT token for frontend authentication
     access_token_expires = timedelta(seconds=settings.JWT_ACCESS_TOKEN_EXPIRE_SECONDS)
     token = create_access_token(data={"sub": str(user.twitter_username)}, expires_delta=access_token_expires)
 
