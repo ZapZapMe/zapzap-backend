@@ -63,6 +63,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="User already exists")
 
     new_user = User(twitter_username=user_data.twitter_username)
+    new_user = new_user.lower()
     db.add(new_user)
     db.commit()
     db.refresh(new_user)

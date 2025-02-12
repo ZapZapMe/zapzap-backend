@@ -118,6 +118,7 @@ def create_tip(
             if not receiver:
                 logging.warning(f"Receiver {username} not found in DB. Creating new user with is_registered=False.")
                 receiver = User(twitter_username=username, is_registered=False)
+                receiver = receiver.lower()
                 db.add(receiver)
                 db.flush()
             else:
