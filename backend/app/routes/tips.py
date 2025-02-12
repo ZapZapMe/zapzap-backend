@@ -110,6 +110,9 @@ def create_tip(
 ):
     try:
         username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
+        # Convert username to lowercase immediately
+        username = username.lower()
+        
         tweet = db.query(Tweet).filter(Tweet.id == tweet_id).first()
         if not tweet:
             logging.info(f"Tweet {tweet_id} not found. Creating new tweet.")
@@ -117,8 +120,8 @@ def create_tip(
 
             if not receiver:
                 logging.warning(f"Receiver {username} not found in DB. Creating new user with is_registered=False.")
+                # Create new user with lowercase username
                 receiver = User(twitter_username=username, is_registered=False)
-                receiver = receiver.lower()
                 db.add(receiver)
                 db.flush()
             else:
@@ -168,7 +171,6 @@ def create_tip(
         logging.error(f"Unexpected error occurred: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to create tip. Reason: {str(e)}")
 
-
 @router.get("/", response_model=list[TipOut])
 def list_tips(db: Session = Depends(get_db)):
     # Order tips from new to old
@@ -202,7 +204,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
         .join(User, User.id == Tip.tip_sender)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User2, User2.id == Tweet.tweet_author)
-        .filter(Tip.tip_sender == user.id)
+        .filter(Tip.tip_sender == user.id, Tip.paid_out.is_(True))
         .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )
@@ -235,7 +237,7 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
         db.query(Tip)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User, User.id == Tweet.tweet_author)
-        .filter(Tweet.tweet_author == user.id)
+        .filter(Tweet.tweet_author == user.id, Tip.paid_out.is_(True))
         .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )

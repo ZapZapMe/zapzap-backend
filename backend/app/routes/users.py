@@ -58,12 +58,14 @@ def list_users(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=UserCreate)
 def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.twitter_username == user_data.twitter_username).first()
+    # Convert username to lowercase before checking or creating
+    username = user_data.twitter_username.lower()
+    
+    existing_user = db.query(User).filter(User.twitter_username == username).first()
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
 
-    new_user = User(twitter_username=user_data.twitter_username)
-    new_user = new_user.lower()
+    new_user = User(twitter_username=username)  # Use lowercase username directly
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
