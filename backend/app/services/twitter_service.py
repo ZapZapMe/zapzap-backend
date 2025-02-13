@@ -44,7 +44,7 @@ def update_user_avatars(db: Session, usernames: List[str]) -> None:
                 
             for user_data in response.data:
                 db.merge(User(
-                    twitter_username=user_data.username,
+                    twitter_username=user_data.username.lower(),
                     avatar_url=user_data.profile_image_url,
                     avatar_updated_at=datetime.now(timezone.utc)
                 ))
