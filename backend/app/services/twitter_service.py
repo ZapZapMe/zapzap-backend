@@ -86,7 +86,12 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip) -> None:
     tipper_username = f"@{tip.sender.twitter_username}" if tip.sender else "Anonymous"
     recipient = tip.tweet.author.twitter_username
     
-    reply_text = f"⚡{comment}⚡ {tipper_username} zapped you {tip.amount_sats} sats zap-zap.me/{recipient}"
+    # Base reply text
+    reply_text = f"⚡{comment}⚡ {tipper_username} zapped you {tip.amount_sats} sats"
+    
+    # Add zap-zap.me link only if the receiver has NO wallet address
+    if not tip.tweet.author.wallet_address:
+        reply_text += f" zap-zap.me/{recipient}"
 
     try:
         response = post_tweet(str(tip.tweet_id), reply_text)
@@ -94,3 +99,6 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip) -> None:
     except HTTPException as e:
         logging.error(f"HTTP error occurred: {e.detail}")
         raise
+
+
+
