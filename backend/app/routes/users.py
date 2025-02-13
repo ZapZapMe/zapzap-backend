@@ -50,12 +50,6 @@ def update_user_profile(
     return user
 
 
-@router.get("/", response_model=list[UserOut])
-def list_users(db: Session = Depends(get_db)):
-    users = db.query(User).all()
-    return users
-
-
 @router.post("/", response_model=UserCreate)
 def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     # Convert username to lowercase before checking or creating
