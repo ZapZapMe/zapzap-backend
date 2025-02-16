@@ -10,8 +10,8 @@ from services.lightning_service import create_invoice
 from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
-from utils.tweet_data_extract import extract_username_and_tweet_id
 from utils.security import get_current_user
+from utils.tweet_data_extract import extract_username_and_tweet_id
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
@@ -110,6 +110,9 @@ def create_tip(
 ):
     try:
         username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
+        # Convert username to lowercase immediately
+        username = username.lower()
+
         tweet = db.query(Tweet).filter(Tweet.id == tweet_id).first()
         if not tweet:
             logging.info(f"Tweet {tweet_id} not found. Creating new tweet.")
@@ -117,6 +120,7 @@ def create_tip(
 
             if not receiver:
                 logging.warning(f"Receiver {username} not found in DB. Creating new user with is_registered=False.")
+                # Create new user with lowercase username
                 receiver = User(twitter_username=username, is_registered=False)
                 db.add(receiver)
                 db.flush()
@@ -201,7 +205,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
         .join(User, User.id == Tip.tip_sender)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User2, User2.id == Tweet.tweet_author)
-        .filter(Tip.tip_sender == user.id)
+        .filter(Tip.tip_sender == user.id, Tip.paid_in.is_(True))
         .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )
@@ -229,19 +233,19 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(func.lower(User.twitter_username) == username.lower()).first()
     if not user:
         raise HTTPException(status_code=400, detail="User not found.")
-    
+
     tips = (
         db.query(Tip)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User, User.id == Tweet.tweet_author)
-        .filter(Tweet.tweet_author == user.id)
+        .filter(Tweet.tweet_author == user.id, Tip.paid_in.is_(True))
         .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )
 
     sender_usernames = [tip.sender.twitter_username for tip in tips if tip.sender is not None]
     avatars_map = get_avatars_for_usernames(sender_usernames, db)
-    
+
     return [
         TipSummary(
             tip_sender=tip.sender.twitter_username if tip.sender else None,

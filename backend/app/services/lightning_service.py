@@ -80,10 +80,17 @@ def send_lnurl_payment(lnurl_address: str, amount_sats: int):
 
 def forward_payment_to_receiver(tip_id: int):
     with SessionLocal() as db:
+        # Initial checks
         tip = db.query(Tip).filter(Tip.id == tip_id).first()
         if not tip:
             logging.error(f"Tip ID {tip_id} not found.")
             return None
+            
+        # Double-check paid status before proceeding
+        if tip.paid_out:
+            logging.warning(f"Tip {tip_id} is already marked as paid out. Skipping payment.")
+            return tip.forward_payment_hash
+            
         if not tip.paid_in:
             logging.error(f"Tip ID {tip_id} is not marked as paid.")
             return None
@@ -93,7 +100,14 @@ def forward_payment_to_receiver(tip_id: int):
             return None
 
         receiver = tip.tweet.author
-        post_reply_to_twitter_with_comment(db, tip)
+        
+        # Only post reply if we haven't paid out yet
+        if not tip.paid_out:
+            try:
+                post_reply_to_twitter_with_comment(db, tip)
+            except Exception as e:
+                logging.warning(f"Failed to post Twitter reply for tip {tip_id}: {e}")
+                # Continue with payment even if Twitter post fails
 
         if not receiver or not receiver.wallet_address:
             logging.error(f"Receiver @{receiver.twitter_username} not found or does not have wallet address.")
@@ -102,24 +116,60 @@ def forward_payment_to_receiver(tip_id: int):
         address_str = receiver.wallet_address
         logging.info(f"Forwarding {tip.amount_sats} sats to @{receiver.twitter_username} at address {address_str}")
 
-        logging.error(f"[LNURL] Attempting LNURL pay for {address_str}")
-        payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
+        # First attempt - original case as stored
+        try:
+            logging.info(f"[LNURL] Attempting LNURL pay for original case: {address_str}")
+            payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
+            
+            # Recheck paid status before marking as paid
+            db.refresh(tip)
+            if tip.paid_out:
+                logging.warning(f"Tip {tip_id} was marked as paid during processing. Skipping payment confirmation.")
+                return tip.forward_payment_hash
+                
+            if payment_hash:
+                tip.forward_payment_hash = payment_hash
+                tip.paid_out = True
+                db.commit()
+                logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
+                return payment_hash
+        except Exception as e:
+            logging.info(f"Payment failed with original case, trying lowercase: {e}")
 
-        if payment_hash:
-            tip.forward_payment_hash = payment_hash
-            tip.paid_out = True
-            db.commit()
-            logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
-            try:
-                print("The tip sender is ", tip.sender)
-            except Exception as e:
-                logging.error(f"[mark_invoice_as_paid_in_db] Failed to post reply to Twitter: {e}")
-            return payment_hash
-        else:
-            logging.error(
-                f"No payment options found for sending {tip.amount_sats} sats to @{receiver.twitter_username}"
-            )
-            return None
+        # Second attempt - lowercase
+        try:
+            lowercase_address = address_str.lower()
+            if lowercase_address == address_str:
+                logging.info("Address is already lowercase, skipping second attempt")
+                return None
+                
+            logging.info(f"[LNURL] Attempting LNURL pay for lowercase: {lowercase_address}")
+            
+            # Double check paid status again before second attempt
+            db.refresh(tip)
+            if tip.paid_out:
+                logging.warning(f"Tip {tip_id} was marked as paid during processing. Skipping second attempt.")
+                return tip.forward_payment_hash
+                
+            payment_hash = send_lnurl_payment(lowercase_address, tip.amount_sats)
+            if payment_hash:
+                tip.forward_payment_hash = payment_hash
+                tip.paid_out = True
+                db.commit()
+                logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username} using lowercase address")
+                return payment_hash
+        except Exception as e:
+            logging.error(f"Payment failed with both cases: {e}")
+            
+        try:
+            print("The tip sender is ", tip.sender)
+        except Exception as e:
+            logging.error(f"[mark_invoice_as_paid_in_db] Failed to log tip sender: {e}")
+
+        logging.error(
+            f"No payment options found for sending {tip.amount_sats} sats to @{receiver.twitter_username}"
+        )
+        return None
 
 
 def forward_pending_tips_for_user(user_id: int, db: Session):

@@ -44,7 +44,7 @@ def update_user_avatars(db: Session, usernames: List[str]) -> None:
                 
             for user_data in response.data:
                 db.merge(User(
-                    twitter_username=user_data.username,
+                    twitter_username=user_data.username.lower(),
                     avatar_url=user_data.profile_image_url,
                     avatar_updated_at=datetime.now(timezone.utc)
                 ))
@@ -84,8 +84,14 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip) -> None:
     
     comment = tip.comment or "No comment"
     tipper_username = f"@{tip.sender.twitter_username}" if tip.sender else "Anonymous"
+    recipient = tip.tweet.author.twitter_username
     
+    # Base reply text
     reply_text = f"⚡{comment}⚡ {tipper_username} zapped you {tip.amount_sats} sats"
+    
+    # Add zap-zap.me link only if the receiver has NO wallet address
+    if not tip.tweet.author.wallet_address:
+        reply_text += f" zap-zap.me/{recipient}"
 
     try:
         response = post_tweet(str(tip.tweet_id), reply_text)
@@ -93,3 +99,6 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip) -> None:
     except HTTPException as e:
         logging.error(f"HTTP error occurred: {e.detail}")
         raise
+
+
+

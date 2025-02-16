@@ -49,6 +49,7 @@ async def twitter_callback(request: Request, db: Session = Depends(get_db)):
     user_info = await get_twitter_user_info(access_token)
     # twitter_id = user_info["data"]["id"]
     twitter_username = user_info["data"]["username"]
+    twitter_username = twitter_username.lower()
 
     user = db.query(User).filter(User.twitter_username == twitter_username).first()
 
