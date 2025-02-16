@@ -205,7 +205,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
         .join(User, User.id == Tip.tip_sender)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User2, User2.id == Tweet.tweet_author)
-        .filter(Tip.tip_sender == user.id)
+        .filter(Tip.tip_sender == user.id, Tip.paid_in.is_true())
         .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )
