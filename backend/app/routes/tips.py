@@ -10,8 +10,8 @@ from services.lightning_service import create_invoice
 from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
-from utils.tweet_data_extract import extract_username_and_tweet_id
 from utils.security import get_current_user
+from utils.tweet_data_extract import extract_username_and_tweet_id
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
