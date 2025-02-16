@@ -10,8 +10,8 @@ from services.lightning_service import create_invoice
 from services.twitter_service import get_avatars_for_usernames
 from sqlalchemy import func
 from sqlalchemy.orm import Session, aliased
-from utils.tweet_data_extract import extract_username_and_tweet_id
 from utils.security import get_current_user
+from utils.tweet_data_extract import extract_username_and_tweet_id
 
 router = APIRouter(prefix="/tips", tags=["tips"])
 
@@ -205,7 +205,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
         .join(User, User.id == Tip.tip_sender)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User2, User2.id == Tweet.tweet_author)
-        .filter(Tip.tip_sender == user.id)
+        .filter(Tip.tip_sender == user.id, Tip.paid_in.is_true())  #
         .order_by(Tip.created_at.desc())  # Order from new to old
         .all()
     )
