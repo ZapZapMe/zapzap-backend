@@ -200,6 +200,7 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
             Tip.tweet_id,
             Tweet.id.label("tweet_id"),
             User2.twitter_username.label("recipient"),
+            Tip.paid_in,
             Tip.comment,  # Including comment in the query
         )
         .join(User, User.id == Tip.tip_sender)
