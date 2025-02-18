@@ -35,14 +35,16 @@ def update_user_profile(
         raise HTTPException(status_code=404, detail="User not found!")
 
     updated = False
-    if user_update.wallet_address and user.wallet_address != user_update.wallet_address:
-        user.wallet_address = user_update.wallet_address
-        updated = True
+    if user_update.wallet_address is not None:  # Allow explicitly setting to None
+        # Validation is already handled by Pydantic model
+        if user.wallet_address != user_update.wallet_address:
+            user.wallet_address = user_update.wallet_address
+            updated = True
 
     db.commit()
     db.refresh(user)
 
-    if updated:
+    if updated and user.wallet_address:
         logging.info(
             f"User @{user.twitter_username} updated their wallet address. Initiating forwarding of pending tips."
         )
@@ -52,14 +54,15 @@ def update_user_profile(
 
 @router.post("/", response_model=UserCreate)
 def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
-    # Convert username to lowercase before checking or creating
-    username = user_data.twitter_username.lower()
-    
-    existing_user = db.query(User).filter(User.twitter_username == username).first()
+    # Username is already lowercase from Pydantic validation
+    existing_user = db.query(User).filter(User.twitter_username == user_data.twitter_username).first()
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
 
-    new_user = User(twitter_username=username)  # Use lowercase username directly
+    new_user = User(
+        twitter_username=user_data.twitter_username,
+        wallet_address=user_data.wallet_address
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
