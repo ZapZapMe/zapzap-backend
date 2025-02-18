@@ -160,11 +160,6 @@ def forward_payment_to_receiver(tip_id: int):
                 return payment_hash
         except Exception as e:
             logging.error(f"Payment failed with both cases: {e}")
-            
-        try:
-            print("The tip sender is ", tip.sender)
-        except Exception as e:
-            logging.error(f"[mark_invoice_as_paid_in_db] Failed to log tip sender: {e}")
 
         logging.error(
             f"No payment options found for sending {tip.amount_sats} sats to @{receiver.twitter_username}"

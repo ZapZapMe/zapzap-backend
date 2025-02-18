@@ -155,7 +155,6 @@ def create_tip(
         db.commit()
         db.refresh(new_tip)
         logging.info(f"New tip created: {new_tip.id} for tweet {tweet_id}")
-        print("BOLT11: ", bolt11_invoice)
 
         return TipInvoice(
             tip_recipient=username,
