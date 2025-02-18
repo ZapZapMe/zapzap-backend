@@ -113,6 +113,10 @@ def create_tip(
         # Convert username to lowercase immediately
         username = username.lower()
 
+        # Check if user is trying to tip themselves
+        if username.lower() == current_user.twitter_username.lower():
+            raise HTTPException(status_code=400, detail="You cannot tip yourself.")
+
         tweet = db.query(Tweet).filter(Tweet.id == tweet_id).first()
         if not tweet:
             logging.info(f"Tweet {tweet_id} not found. Creating new tweet.")
