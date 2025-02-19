@@ -82,7 +82,7 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip) -> None:
         logging.warning(f"Tweet {tip.tweet_id} not found. Skipping reply.")
         return
     
-    comment = tip.comment or "No comment"
+    comment = tip.comment or ""
     tipper_username = f"@{tip.sender.twitter_username}" if tip.sender else "Anonymous"
     recipient = tip.tweet.author.twitter_username
     
