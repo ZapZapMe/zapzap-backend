@@ -42,22 +42,20 @@ def get_most_tipped_users(db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
-    usernames = [t.tip_recipient for t in tips]
+    # usernames = [t.tip_recipient for t in tips]
 
-    avatars_map = get_avatars_for_usernames(usernames, db)
+    # avatars_map = get_avatars_for_usernames(usernames, db)
 
     result = []
     for t in tips:
-        avatar_url = avatars_map.get(t.tip_recipient) or ""
+        # avatar_url = avatars_map.get(t.tip_recipient) or ""
         result.append(
             LeaderboardReceived(
                 tip_recipient=t.tip_recipient,
                 total_amount_sats=t.total_amount_sats,
                 tip_count=t.tip_count,
-                avatar_url=avatar_url,
             )
         )
-
     return result
 
 
@@ -83,19 +81,19 @@ def get_most_active_tippers(db: Session = Depends(get_db)):
         .limit(10)
         .all()
     )
-    usernames = [t.tip_sender for t in tips]
+    # usernames = [t.tip_sender for t in tips]
 
-    avatars_map = get_avatars_for_usernames(usernames, db)
+    # avatars_map = get_avatars_for_usernames(usernames, db)
 
     result = []
     for t in tips:
-        avatar_url = avatars_map.get(t.tip_sender) or ""
+        # avatar_url = avatars_map.get(t.tip_sender) or ""
         result.append(
             LeaderboardSent(
                 tip_sender=t.tip_sender,
                 total_amount_sats=t.total_amount_sats,
                 tip_count=t.tip_count,
-                avatar_url=avatar_url,
+                #       avatar_url=avatar_url,
             )
         )
 
@@ -112,6 +110,10 @@ def create_tip(
         username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
         # Convert username to lowercase immediately
         username = username.lower()
+
+        # Check if user is trying to tip themselves
+        if username.lower() == current_user.twitter_username.lower():
+            raise HTTPException(status_code=400, detail="You cannot tip yourself.")
 
         tweet = db.query(Tweet).filter(Tweet.id == tweet_id).first()
         if not tweet:
@@ -155,7 +157,6 @@ def create_tip(
         db.commit()
         db.refresh(new_tip)
         logging.info(f"New tip created: {new_tip.id} for tweet {tweet_id}")
-        print("BOLT11: ", bolt11_invoice)
 
         return TipInvoice(
             tip_recipient=username,
