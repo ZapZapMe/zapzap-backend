@@ -159,6 +159,7 @@ def create_tip(
         logging.info(f"New tip created: {new_tip.id} for tweet {tweet_id}")
 
         return TipInvoice(
+            tip_id=new_tip.id,
             tip_recipient=username,
             amount_sats=new_tip.amount_sats,
             bolt11_invoice=bolt11_invoice,

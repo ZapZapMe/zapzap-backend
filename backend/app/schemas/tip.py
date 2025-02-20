@@ -68,6 +68,7 @@ class TipSummary(BaseModel):
 
 
 class TipInvoice(BaseModel):
+    tip_id: str
     tip_recipient: str
     amount_sats: int
     bolt11_invoice: str
