@@ -88,6 +88,8 @@ def post_reply_to_twitter_with_comment(db: Session, tip: Tip) -> None:
 
     try:
         response = post_tweet(str(tip.tweet_id), reply_text)
+        tip.reply_tweet_id = response["id"]
+        db.commit()
         logging.info(f"Posted reply to tweet {tip.tweet_id} for Tip #{tip.id}. Response: {response}")
     except HTTPException as e:
         logging.error(f"HTTP error occurred: {e.detail}")
