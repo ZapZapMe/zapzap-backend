@@ -103,12 +103,12 @@ def forward_payment_to_receiver(tip_id: int):
         receiver = tip.tweet.author
 
         # Only post reply if we haven't paid out yet
-        if not tip.paid_out:
-            try:
-                post_reply_to_twitter_with_comment(db, tip)
-            except Exception as e:
-                logging.warning(f"Failed to post Twitter reply for tip {tip_id}: {e}")
-                # Continue with payment even if Twitter post fails
+        # if not tip.paid_out:
+        #     try:
+        #         post_reply_to_twitter_with_comment(db, tip)
+        #     except Exception as e:
+        #         logging.warning(f"Failed to post Twitter reply for tip {tip_id}: {e}")
+        # Continue with payment even if Twitter post fails
 
         if not receiver or not receiver.wallet_address:
             logging.error(f"Receiver @{receiver.twitter_username} not found or does not have wallet address.")
