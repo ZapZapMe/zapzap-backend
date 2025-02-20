@@ -50,6 +50,7 @@ class Tip(Base):
     # Foreign keys
     tip_sender: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)  # null = anonymous
     tweet_id: Mapped[int] = mapped_column(ForeignKey("tweets.id"), nullable=False)
+    reply_tweet_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
 
     # Fields
     ln_payment_hash: Mapped[str] = mapped_column(nullable=False, index=True)

@@ -195,35 +195,27 @@ def get_sent_tips_by_username(username: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User not found.")
 
     tips = (
-        db.query(
-            User.twitter_username.label("tip_sender"),
-            Tip.amount_sats,
-            Tip.created_at,
-            Tip.tweet_id,
-            Tweet.id.label("tweet_id"),
-            User2.twitter_username.label("recipient"),
-            Tip.paid_in,
-            Tip.comment,  # Including comment in the query
-        )
+        db.query(Tip)  # Query the full Tip model instead of individual fields
         .join(User, User.id == Tip.tip_sender)
         .join(Tweet, Tweet.id == Tip.tweet_id)
         .join(User2, User2.id == Tweet.tweet_author)
         .filter(Tip.tip_sender == user.id, Tip.paid_in.is_(True))
-        .order_by(Tip.created_at.desc())  # Order from new to old
+        .order_by(Tip.created_at.desc())
         .all()
     )
 
-    recipient_usernames = [tip.recipient for tip in tips]
+    recipient_usernames = [tip.tweet.author.twitter_username for tip in tips]
     avatars_map = get_avatars_for_usernames(recipient_usernames, db)
 
     return [
         TipSummary(
-            tip_sender=tip.tip_sender,
-            recipient=tip.recipient,
+            tip_sender=tip.sender.twitter_username if tip.sender else None,
+            recipient=tip.tweet.author.twitter_username,
             amount_sats=tip.amount_sats,
             created_at=tip.created_at,
             tweet_id=tip.tweet_id,
-            avatar_url=avatars_map.get(tip.recipient),
+            reply_tweet_id=tip.reply_tweet_id,
+            avatar_url=avatars_map.get(tip.tweet.author.twitter_username),
             comment=tip.comment,
             tip_type="sent",
         )
@@ -255,6 +247,7 @@ def get_received_tips_by_username(username: str, db: Session = Depends(get_db)):
             amount_sats=tip.amount_sats,
             created_at=tip.created_at,
             tweet_id=tip.tweet_id,
+            reply_tweet_id=tip.reply_tweet_id,
             recipient=username,
             avatar_url=avatars_map.get(tip.sender.twitter_username) if tip.sender else None,
             comment=tip.comment,

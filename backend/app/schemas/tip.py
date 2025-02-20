@@ -24,6 +24,7 @@ class TipOut(BaseModel):
     comment: Optional[str]
     created_at: datetime
     tweet_id: str
+    reply_tweet_id: Optional[str]
     paid_in: bool
     paid_out: bool
     ln_payment_hash: Optional[str] = None
@@ -58,6 +59,7 @@ class TipSummary(BaseModel):
     amount_sats: int
     created_at: datetime
     tweet_id: str
+    reply_tweet_id: Optional[str]
     recipient: str
     avatar_url: Optional[str] = None
     comment: Optional[str] = None
