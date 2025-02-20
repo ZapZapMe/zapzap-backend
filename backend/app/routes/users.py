@@ -3,17 +3,12 @@ import logging
 from db import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.db import User
-from schemas.user import (
-    UserCreate,
-    UserOut,
-    UserUpdate,
-    UserLimitedOut
-)
+from schemas.user import UserCreate, UserLimitedOut, UserOut, UserUpdate
 from services.lightning_service import forward_pending_tips_for_user
 from services.twitter_service import get_avatars_for_usernames
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from utils.security import get_current_user
-from sqlalchemy import func
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -59,10 +54,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=409, detail="User already exists")
 
-    new_user = User(
-        twitter_username=user_data.twitter_username,
-        wallet_address=user_data.wallet_address
-    )
+    new_user = User(twitter_username=user_data.twitter_username, wallet_address=user_data.wallet_address)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -74,16 +66,16 @@ def get_user_by_username(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(func.lower(User.twitter_username) == username.lower()).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Use the user's actual Twitter username from the database for consistency
     result_dic = get_avatars_for_usernames([user.twitter_username], db)
     avatar_url = result_dic.get(user.twitter_username, None)
-    
+
     user_data = {
         "twitter_username": user.twitter_username,
         "wallet_address": user.wallet_address,
         "avatar_url": avatar_url,
-        "twitter_link": f"https://x.com/{user.twitter_username}"
+        "twitter_link": f"https://x.com/{user.twitter_username}",
     }
-    
+
     return user_data

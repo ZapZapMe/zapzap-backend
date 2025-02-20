@@ -1,6 +1,7 @@
+import json
 import logging
 import threading
-import json
+
 import breez_sdk
 from breez_sdk import (
     ConnectRequest,
@@ -85,12 +86,12 @@ def forward_payment_to_receiver(tip_id: int):
         if not tip:
             logging.error(f"Tip ID {tip_id} not found.")
             return None
-            
+
         # Double-check paid status before proceeding
         if tip.paid_out:
             logging.warning(f"Tip {tip_id} is already marked as paid out. Skipping payment.")
             return tip.forward_payment_hash
-            
+
         if not tip.paid_in:
             logging.error(f"Tip ID {tip_id} is not marked as paid.")
             return None
@@ -100,7 +101,7 @@ def forward_payment_to_receiver(tip_id: int):
             return None
 
         receiver = tip.tweet.author
-        
+
         # Only post reply if we haven't paid out yet
         if not tip.paid_out:
             try:
@@ -120,13 +121,13 @@ def forward_payment_to_receiver(tip_id: int):
         try:
             logging.info(f"[LNURL] Attempting LNURL pay for original case: {address_str}")
             payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
-            
+
             # Recheck paid status before marking as paid
             db.refresh(tip)
             if tip.paid_out:
                 logging.warning(f"Tip {tip_id} was marked as paid during processing. Skipping payment confirmation.")
                 return tip.forward_payment_hash
-                
+
             if payment_hash:
                 tip.forward_payment_hash = payment_hash
                 tip.paid_out = True
@@ -142,28 +143,28 @@ def forward_payment_to_receiver(tip_id: int):
             if lowercase_address == address_str:
                 logging.info("Address is already lowercase, skipping second attempt")
                 return None
-                
+
             logging.info(f"[LNURL] Attempting LNURL pay for lowercase: {lowercase_address}")
-            
+
             # Double check paid status again before second attempt
             db.refresh(tip)
             if tip.paid_out:
                 logging.warning(f"Tip {tip_id} was marked as paid during processing. Skipping second attempt.")
                 return tip.forward_payment_hash
-                
+
             payment_hash = send_lnurl_payment(lowercase_address, tip.amount_sats)
             if payment_hash:
                 tip.forward_payment_hash = payment_hash
                 tip.paid_out = True
                 db.commit()
-                logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username} using lowercase address")
+                logging.info(
+                    f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username} using lowercase address"
+                )
                 return payment_hash
         except Exception as e:
             logging.error(f"Payment failed with both cases: {e}")
 
-        logging.error(
-            f"No payment options found for sending {tip.amount_sats} sats to @{receiver.twitter_username}"
-        )
+        logging.error(f"No payment options found for sending {tip.amount_sats} sats to @{receiver.twitter_username}")
         return None
 
 
@@ -277,12 +278,10 @@ def notify_clients_of_payment_status(payment_hash: str):
         return
     for q in connections[payment_hash]:
         # Create a properly formatted JSON message
-        message = json.dumps({
-            "payment_hash": payment_hash,
-            "status": "paid",
-            "message": "Payment received successfully."
-        })
-        
+        message = json.dumps(
+            {"payment_hash": payment_hash, "status": "paid", "message": "Payment received successfully."}
+        )
+
         # Send the actual message
         q.put_nowait(message)
 

@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import BaseModel, validator
 from utils.validators import WalletAddressValidator
 
 
@@ -10,7 +9,7 @@ class UserCreate(BaseModel):
     twitter_username: str
     wallet_address: Optional[str] = None
 
-    @validator('wallet_address')
+    @validator("wallet_address")
     def validate_wallet_address(cls, v):
         if v is None:
             return v
@@ -19,7 +18,7 @@ class UserCreate(BaseModel):
             raise ValueError(error_msg)
         return v.strip()  # Just remove whitespace, preserve case
 
-    @validator('twitter_username')
+    @validator("twitter_username")
     def validate_twitter_username(cls, v):
         if not v:
             raise ValueError("Twitter username cannot be empty")
@@ -32,7 +31,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     wallet_address: Optional[str] = None
 
-    @validator('wallet_address')
+    @validator("wallet_address")
     def validate_wallet_address(cls, v):
         if v is None:
             return v
@@ -53,6 +52,7 @@ class UserOut(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 class UserLimitedOut(BaseModel):
     twitter_username: str
