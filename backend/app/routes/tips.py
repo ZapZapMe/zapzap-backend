@@ -138,6 +138,8 @@ def create_tip(
             )
             db.add(tweet)
             db.flush()
+        else:
+            receiver = tweet.author
 
         payment_hash, bolt11_invoice = create_invoice(
             tip_data.amount_sats,
@@ -164,6 +166,7 @@ def create_tip(
             amount_sats=new_tip.amount_sats,
             bolt11_invoice=bolt11_invoice,
             payment_hash=payment_hash,
+            has_wallet_address=bool(receiver.wallet_address),
         )
 
     except HTTPException as http_exc:
