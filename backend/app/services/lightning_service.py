@@ -209,69 +209,40 @@ def forward_pending_tips_for_user(user_id: int, db: Session):
             logging.error(f"Exception occured while forwarding tip #{tip.id}: {e}")
 
 
-def mark_invoice_as_paid_in_db(invoice_or_hash: str):
-    with SessionLocal() as db:
-        tip = db.query(Tip).filter(Tip.ln_payment_hash == invoice_or_hash).first()
-        # if not tip:
-        #     tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
-        if not tip:
-            return
-
-        if not tip.paid_in:
-            tip.paid_in = True
-            db.commit()
-            logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
-
-        if tip.tweet and tip.tweet.author:
-            recipient_twitter_username = tip.tweet.author.twitter_username
-        else:
-            logging.error(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} has no recipient Twitter username.")
-            recipient_twitter_username = None
-
-        if not tip.paid_out:
-            try:
-                payment_hash = forward_payment_to_receiver(tip.id)
-                if payment_hash:
-                    tip.forward_payment_hash = payment_hash
-                    tip.paid_out = True
-                    db.commit()
-                    logging.info(
-                        f"[mark_invoice_as_paid_in_db] Forwarded {tip.amount_sats} sats to receiver @{recipient_twitter_username}. Tip #{tip.id} marked as paid out."
-                    )
-                else:
-                    logging.error(f"[mark_invoice_as_paid_in_db] Forwarding payment failed for Tip #{tip.id}")
-            except Exception as e:
-                logging.error(f"[mark_invoice_as_paid_in_db] Failed to forward payment for Tip #{tip.id}: {e}")
-        else:
-            logging.info("[mark_invoice_as_paid_in_db] no match or already paid!")
-
-
 class MyGreenlightListener(EventListener):
     def on_event(self, sdk_event):
-        logging.info(f"[MyGreenlightListener] Received event: {sdk_event}")
         if isinstance(sdk_event, breez_sdk.BreezEvent.INVOICE_PAID):
             payment_hash = sdk_event.details.payment_hash
             logging.info(f"[MyGreenlightListener] Payment received, hash={payment_hash}")
 
             with SessionLocal() as db:
-                tip = db.query(Tip).filter(Tip.ln_payment_hash == payment_hash).first()
+                tip = (
+                    db.query(Tip)
+                    .filter(Tip.ln_payment_hash == payment_hash)
+                    .with_for_update()  # Lock the row
+                    .first()
+                )
+
                 if not tip:
                     logging.warning(f"[MyGreenlightListener] Tip not found for hash={payment_hash}")
                     return
 
-                if not tip.paid_in:
+                if tip.paid_out:
+                    logging.info(f"[MyGreenlightListener] Tip #{tip.id} already paid out, skipping.")
+                    return
+
+                was_unpaid = not tip.paid_in
+                if was_unpaid:
                     tip.paid_in = True
                     db.commit()
                     logging.info(f"[MyGreenlightListener] Marked tip #{tip.id} as paid_in.")
-                else:
-                    logging.info(f"[MyGreenlightListener] Tip #{tip.id} was already paid_in.")
 
-                # Now spawn a separate thread for LNURL pay
-                t = threading.Thread(target=forward_payment_to_receiver, args=(tip.id,))
-                t.start()
-                logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id} in LNURL.")
-            # Notify all clients subscribed to this payment hash
-            notify_clients_of_payment_status(payment_hash)
+                    # Only spawn forwarding thread if we just marked it as paid
+                    t = threading.Thread(target=forward_payment_to_receiver, args=(tip.id,))
+                    t.start()
+                    logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id}")
+                else:
+                    logging.info(f"[MyGreenlightListener] Tip #{tip.id} was already paid_in, skipping.")
 
 
 def notify_clients_of_payment_status(payment_hash: str):
@@ -346,3 +317,40 @@ def create_invoice(amount_sats: int, description: str = "Tip invoice"):
 
     # Return the invoice and payment hash
     return payment_hash, bolt11_invoice
+
+
+# def mark_invoice_as_paid_in_db(invoice_or_hash: str):
+#     with SessionLocal() as db:
+#         tip = db.query(Tip).filter(Tip.ln_payment_hash == invoice_or_hash).first()
+#         # if not tip:
+#         #     tip = db.query(Tip).filter(Tip.bolt11_invoice == invoice_or_hash).first()
+#         if not tip:
+#             return
+
+#         if not tip.paid_in:
+#             tip.paid_in = True
+#             db.commit()
+#             logging.info(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} is now paid!")
+
+#         if tip.tweet and tip.tweet.author:
+#             recipient_twitter_username = tip.tweet.author.twitter_username
+#         else:
+#             logging.error(f"[mark_invoice_as_paid_in_db] Tip #{tip.id} has no recipient Twitter username.")
+#             recipient_twitter_username = None
+
+#         if not tip.paid_out:
+#             try:
+#                 payment_hash = forward_payment_to_receiver(tip.id)
+#                 if payment_hash:
+#                     tip.forward_payment_hash = payment_hash
+#                     tip.paid_out = True
+#                     db.commit()
+#                     logging.info(
+#                         f"[mark_invoice_as_paid_in_db] Forwarded {tip.amount_sats} sats to receiver @{recipient_twitter_username}. Tip #{tip.id} marked as paid out."
+#                     )
+#                 else:
+#                     logging.error(f"[mark_invoice_as_paid_in_db] Forwarding payment failed for Tip #{tip.id}")
+#             except Exception as e:
+#                 logging.error(f"[mark_invoice_as_paid_in_db] Failed to forward payment for Tip #{tip.id}: {e}")
+#         else:
+#             logging.info("[mark_invoice_as_paid_in_db] no match or already paid!")
