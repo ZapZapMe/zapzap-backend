@@ -1,4 +1,3 @@
-import json
 import logging
 import threading
 
@@ -14,7 +13,7 @@ from breez_sdk import (
 from config import settings
 from db import SessionLocal
 from models.db import Tip, Tweet, User
-from routes.sse import connections
+from routes.sse import notify_clients_of_payment_status
 
 # from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
@@ -229,6 +228,7 @@ class MyGreenlightListener(EventListener):
 
                 if tip.paid_out:
                     logging.info(f"[MyGreenlightListener] Tip #{tip.id} already paid out, skipping.")
+                    notify_clients_of_payment_status(payment_hash)  # Add notification
                     return
 
                 was_unpaid = not tip.paid_in
@@ -237,26 +237,16 @@ class MyGreenlightListener(EventListener):
                     db.commit()
                     logging.info(f"[MyGreenlightListener] Marked tip #{tip.id} as paid_in.")
 
+                    # Notify clients that payment was received
+                    notify_clients_of_payment_status(payment_hash)
+
                     # Only spawn forwarding thread if we just marked it as paid
                     t = threading.Thread(target=forward_payment_to_receiver, args=(tip.id,))
                     t.start()
                     logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id}")
                 else:
                     logging.info(f"[MyGreenlightListener] Tip #{tip.id} was already paid_in, skipping.")
-
-
-def notify_clients_of_payment_status(payment_hash: str):
-    # Notify all clients subscribed to this payment_hash, then close their connections.
-    if payment_hash not in connections:
-        return
-    for q in connections[payment_hash]:
-        # Create a properly formatted JSON message
-        message = json.dumps(
-            {"payment_hash": payment_hash, "status": "paid", "message": "Payment received successfully."}
-        )
-
-        # Send the actual message
-        q.put_nowait(message)
+                    notify_clients_of_payment_status(payment_hash)  # Add notification
 
 
 class BreezLogger(breez_sdk.LogStream):
