@@ -75,3 +75,4 @@ class TipInvoice(BaseModel):
     amount_sats: int
     bolt11_invoice: str
     payment_hash: str
+    has_wallet_address: bool
