@@ -15,7 +15,8 @@ from config import settings
 from db import SessionLocal
 from models.db import Tip, Tweet, User
 from routes.sse import connections
-from services.twitter_service import post_reply_to_twitter_with_comment
+
+# from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -52,13 +53,13 @@ def calculate_amount_to_send_sats(amount_sats: int):
     return int(amount_sats - fees)
 
 
-def send_lnurl_payment(lnurl_address: str, amount_sats: int):
+def send_lnurl_payment(lnurl_address: str, amount_sats: int, sender_username: str):
     try:
         parsed_input = breez_sdk.parse_input(lnurl_address)
         if isinstance(parsed_input, breez_sdk.InputType.LN_URL_PAY):
             amount_msat = calculate_amount_to_send_sats(amount_sats) * 1000
             use_trampoline = True
-            comment = "test"
+            comment = f"⚡⚡ ZapZap from @{sender_username}"
 
             req = breez_sdk.LnUrlPayRequest(
                 data=parsed_input.data,
@@ -101,6 +102,7 @@ def forward_payment_to_receiver(tip_id: int):
             return None
 
         receiver = tip.tweet.author
+        sender = tip.sender
 
         # Only post reply if we haven't paid out yet
         # if not tip.paid_out:
@@ -120,7 +122,7 @@ def forward_payment_to_receiver(tip_id: int):
         # First attempt - original case as stored
         try:
             logging.info(f"[LNURL] Attempting LNURL pay for original case: {address_str}")
-            payment_hash = send_lnurl_payment(address_str, tip.amount_sats)
+            payment_hash = send_lnurl_payment(address_str, tip.amount_sats, sender.twitter_username)
 
             # Recheck paid status before marking as paid
             db.refresh(tip)
@@ -152,7 +154,7 @@ def forward_payment_to_receiver(tip_id: int):
                 logging.warning(f"Tip {tip_id} was marked as paid during processing. Skipping second attempt.")
                 return tip.forward_payment_hash
 
-            payment_hash = send_lnurl_payment(lowercase_address, tip.amount_sats)
+            payment_hash = send_lnurl_payment(address_str, tip.amount_sats, sender.twitter_username)
             if payment_hash:
                 tip.forward_payment_hash = payment_hash
                 tip.paid_out = True
