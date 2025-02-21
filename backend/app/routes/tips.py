@@ -108,39 +108,33 @@ def create_tip(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
-        # Convert username to lowercase immediately
-        username = username.lower()
+        # Start transaction
+        with db.begin_nested():
+            username, tweet_id = extract_username_and_tweet_id(tip_data.tweet_url)
+            username = username.lower()
 
-        # Check if user is trying to tip themselves
-        if username.lower() == current_user.twitter_username.lower():
-            raise HTTPException(status_code=400, detail="You cannot tip yourself.")
+            if username.lower() == current_user.twitter_username.lower():
+                raise HTTPException(status_code=400, detail="You cannot tip yourself.")
 
-        tweet = db.query(Tweet).filter(Tweet.id == tweet_id).first()
-        if not tweet:
-            logging.info(f"Tweet {tweet_id} not found. Creating new tweet.")
-            receiver = db.query(User).filter(User.twitter_username == username).first()
+            # Lock the rows we're going to update
+            tweet = db.query(Tweet).filter(Tweet.id == tweet_id).with_for_update().first()
 
-            if not receiver:
-                logging.warning(f"Receiver {username} not found in DB. Creating new user with is_registered=False.")
-                # Create new user with lowercase username
-                receiver = User(twitter_username=username, is_registered=False)
-                db.add(receiver)
+            if not tweet:
+                receiver = db.query(User).filter(User.twitter_username == username).with_for_update().first()
+
+                if not receiver:
+                    receiver = User(twitter_username=username, is_registered=False)
+                    db.add(receiver)
+                    db.flush()
+
+                tweet = Tweet(
+                    id=tweet_id,
+                    tweet_author=receiver.id,
+                )
+                db.add(tweet)
                 db.flush()
             else:
-                if not receiver.wallet_address:
-                    logging.warning(
-                        f"Receiver {receiver.twitter_username} does not have a bolt12 address. Tip will be held."
-                    )
-
-            tweet = Tweet(
-                id=tweet_id,
-                tweet_author=receiver.id,
-            )
-            db.add(tweet)
-            db.flush()
-        else:
-            receiver = tweet.author
+                receiver = tweet.author
 
         payment_hash, bolt11_invoice = create_invoice(
             tip_data.amount_sats,
