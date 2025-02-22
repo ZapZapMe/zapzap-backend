@@ -18,8 +18,6 @@ class Settings(BaseSettings):
     TWITTER_OAUTH2_CLIENT_SECRET: str
     TWITTER_REDIRECT_URI: str
     TWITTER_ACCOUNT_BEARER_TOKEN: str
-    TWITTER_CONSUMER_KEY: str
-    TWITTER_CONSUMER_SECRET: str
 
     # used if we are posting as this the project account holder (not as the logged in user)
     TWITTER_ACCESS_TOKEN: Optional[str] = None
