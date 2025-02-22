@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     TWITTER_OAUTH2_CLIENT_SECRET: str
     TWITTER_REDIRECT_URI: str
     TWITTER_ACCOUNT_BEARER_TOKEN: str
+    TWITTER_CONSUMER_KEY: str
+    TWITTER_CONSUMER_SECRET: str
 
     # used if we are posting as this the project account holder (not as the logged in user)
     TWITTER_ACCESS_TOKEN: Optional[str] = None
@@ -42,8 +44,8 @@ class Settings(BaseSettings):
     GREENLIGHT_CLIENT_PRIVATE_KEY: str
 
     # Application settings
-    LEADERBOARD_CALCULATION_WINDOW_DAYS: int = 7  # a value in .env would override this
-    TWITTER_AVATAR_CACHE_TTL_DAYS: int = 7
+    LEADERBOARD_CALCULATION_WINDOW_DAYS: int = 1  # a value in .env would override this
+    TWITTER_AVATAR_CACHE_TTL_DAYS: int = 30
     BREEZ_LOGLEVEL: str = "INFO"
     FRONTEND_URL: str
 
