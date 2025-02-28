@@ -22,9 +22,9 @@ async def verify_twitter_credentials():
 
     # Log the first few characters of the token (safely)
     token_preview = (
-        settings.TWITTER_ACCOUNT_BEARER_TOKEN[:10] + "..." if settings.TWITTER_ACCOUNT_BEARER_TOKEN else "None"
+        "..." + settings.TWITTER_ACCOUNT_BEARER_TOKEN[-10:] if settings.TWITTER_ACCOUNT_BEARER_TOKEN else "None"
     )
-    logging.info(f"[{request_id}] Bearer token starts with: {token_preview}")
+    logging.info(f"[{request_id}] Bearer token ends with: {token_preview}")
 
     try:
         logging.info(f"[{request_id}] Attempting to test bearer token...")
