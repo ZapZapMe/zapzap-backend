@@ -256,6 +256,10 @@ class BreezLogger(breez_sdk.LogStream):
             print("Received log [", log.level, "]: ", log.line)
 
 
+def init_breez_logging():
+    breez_sdk.set_log_stream(BreezLogger())
+
+
 def connect_breez(restore_only: bool = True):
     """
     Connects to the Breez node and sets up the Breez services globally.
@@ -264,7 +268,6 @@ def connect_breez(restore_only: bool = True):
     """
 
     global sdk_services
-    breez_sdk.set_log_stream(BreezLogger())
     seed = mnemonic_to_seed(settings.BREEZ_MNEMONIC)
 
     # Build the Breez config
@@ -282,10 +285,12 @@ def connect_breez(restore_only: bool = True):
         connect_request = ConnectRequest(config, seed, restore_only=restore_only)
         sdk_services = breez_sdk.connect(connect_request, my_listener)
         logging.info("Breez SDK connected successfully.")
+        return True
 
     except Exception as e:
         logging.error(f"Error connecting to Breez: {e}")
-        raise
+        sdk_services = None
+        return False
 
 
 def create_invoice(amount_sats: int, description: str = "Tip invoice"):
