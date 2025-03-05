@@ -87,6 +87,11 @@ def update_user_avatars(db: Session, usernames: List[str]) -> None:
             logging.info(f"[{request_id}] Twitter API Response: {response}")
             if response.data:
                 for user in response.data:
+                    # Rename _normal to _bigger in the profile_image_url
+                    if user.profile_image_url:
+                        new_url = user.profile_image_url.replace("_normal", "_bigger")
+                        user.profile_image_url = new_url
+
                     logging.info(
                         f"[{request_id}] User data received: username={user.username}, "
                         f"avatar_url={user.profile_image_url}"
