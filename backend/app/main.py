@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import auths, sse, tips, users
 from routes.sse import cleanup_stale_connections
 from services.lightning_service import connect_breez, init_breez_logging
+from services.twitter_mention_monitor import mention_monitor
 from services.twitter_service import verify_twitter_credentials
 
 # Create all DB tables
@@ -79,6 +80,9 @@ async def startup_event():
     except Exception as e:
         logging.error(f"Twitter credentials verification failed: {str(e)}")
         logging.warning("Avatar updates may not work, but app will continue running")
+
+    # Start Twitter mention monitoring
+    asyncio.create_task(mention_monitor.start_monitoring())
 
     # Start SSE cleanup task
     cleanup_task = asyncio.create_task(cleanup_stale_connections())
