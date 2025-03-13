@@ -11,6 +11,15 @@ class Settings(BaseSettings):
     GREETING: str = "Hello, default greeting!"
     LOCAL_DATABASE_URL: str = "sqlite:///./zap-zap.sqlite3"
 
+    # Tenor api key
+    TENOR_API_KEY: str
+
+    # Twitter settings for GiftBot
+    GIFBOT_CONSUMER_KEY: str
+    GIFBOT_CONSUMER_SECRET: str
+    GIFBOT_ACCESS_TOKEN: str
+    GIFBOT_ACCESS_TOKEN_SECRET: str
+
     # Required settings (no default value)
     TWITTER_CONSUMER_KEY: str
     TWITTER_CONSUMER_SECRET: str

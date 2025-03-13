@@ -14,6 +14,7 @@ from config import settings
 from db import SessionLocal
 from models.db import Tip, Tweet, User
 from routes.sse import notify_clients_of_payment_status
+from services.twitter_service import post_gif_to_twitter, post_reply_to_twitter_with_comment
 
 # from services.twitter_service import post_reply_to_twitter_with_comment
 from sqlalchemy.orm import Session
@@ -103,14 +104,23 @@ def forward_payment_to_receiver(tip_id: int):
         receiver = tip.tweet.author
         sender = tip.sender
 
-        # Only post reply if we haven't paid out yet
-        # if not tip.paid_out:
-        #     try:
-        #         post_reply_to_twitter_with_comment(db, tip)
-        #     except Exception as e:
-        #         logging.warning(f"Failed to post Twitter reply for tip {tip_id}: {e}")
-        # Continue with payment even if Twitter post fails
+        tweet_url = None
 
+        # Only post reply if we haven't paid out yet
+        if not tip.paid_out:
+            try:
+                tweet_url = post_gif_to_twitter(db, tip)
+            except Exception as e:
+                logging.warning(f"Failed to post Twitter reply for tip {tip_id}: {e}")
+
+        # If we have a tweet URL but no wallet address, return the tweet URL with a None payment hash
+        if tweet_url and (not receiver or not receiver.wallet_address):
+            logging.error(
+                f"Receiver @{receiver.twitter_username if receiver else 'unknown'} not found or does not have wallet address."
+            )
+            return None, tweet_url  # Return None + tweet_url to indicate payment failed but GIF posted
+
+        # Continue with payment only if we have a wallet address
         if not receiver or not receiver.wallet_address:
             logging.error(f"Receiver @{receiver.twitter_username} not found or does not have wallet address.")
             return None
@@ -127,14 +137,14 @@ def forward_payment_to_receiver(tip_id: int):
             db.refresh(tip)
             if tip.paid_out:
                 logging.warning(f"Tip {tip_id} was marked as paid during processing. Skipping payment confirmation.")
-                return tip.forward_payment_hash
+                return tip.forward_payment_hash, tweet_url
 
             if payment_hash:
                 tip.forward_payment_hash = payment_hash
                 tip.paid_out = True
                 db.commit()
                 logging.info(f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username}")
-                return payment_hash
+                return payment_hash, tweet_url
         except Exception as e:
             logging.info(f"Payment failed with original case, trying lowercase: {e}")
 
@@ -143,7 +153,7 @@ def forward_payment_to_receiver(tip_id: int):
             lowercase_address = address_str.lower()
             if lowercase_address == address_str:
                 logging.info("Address is already lowercase, skipping second attempt")
-                return None
+                return None, tweet_url  # Return the tweet URL even if payment fails
 
             logging.info(f"[LNURL] Attempting LNURL pay for lowercase: {lowercase_address}")
 
@@ -151,7 +161,7 @@ def forward_payment_to_receiver(tip_id: int):
             db.refresh(tip)
             if tip.paid_out:
                 logging.warning(f"Tip {tip_id} was marked as paid during processing. Skipping second attempt.")
-                return tip.forward_payment_hash
+                return tip.forward_payment_hash, tweet_url
 
             payment_hash = send_lnurl_payment(address_str, tip.amount_sats, sender.twitter_username)
             if payment_hash:
@@ -161,12 +171,12 @@ def forward_payment_to_receiver(tip_id: int):
                 logging.info(
                     f"Successfully forwarded {tip.amount_sats} sats to @{receiver.twitter_username} using lowercase address"
                 )
-                return payment_hash
+                return payment_hash, tweet_url
         except Exception as e:
             logging.error(f"Payment failed with both cases: {e}")
 
         logging.error(f"No payment options found for sending {tip.amount_sats} sats to @{receiver.twitter_username}")
-        return None
+        return None, tweet_url  # Return tweet_url even if payment fails
 
 
 def forward_pending_tips_for_user(user_id: int, db: Session):
@@ -240,8 +250,50 @@ class MyGreenlightListener(EventListener):
                     # Notify clients that payment was received
                     notify_clients_of_payment_status(payment_hash)
 
+                    def forward_and_notify():
+                        try:
+                            # First notify clients that payment was received (just once)
+                            notify_clients_of_payment_status(
+                                payment_hash, status="paid", message="Payment received successfully"
+                            )
+
+                            # Then attempt to post GIF and forward payment
+                            result = forward_payment_to_receiver(tip.id)
+
+                            # Check if we got a result with a tweet URL
+                            if isinstance(result, tuple) and result[1]:  # Check if second element (tweet_url) exists
+                                forward_hash, tweet_url = result
+
+                                # Send notification with GIF tweet URL
+                                logging.info(f"Sending SSE notification with GIF tweet URL: {tweet_url}")
+                                notify_clients_of_payment_status(
+                                    payment_hash,  # Use original payment hash
+                                    status="gif_ready",  # New status for GIF
+                                    message="GIF posted successfully",
+                                    tweet_url=tweet_url,
+                                )
+                            # If no wallet address, tweet_url is still set but payment fails
+                            elif result is None:
+                                # Try to get the tweet_url directly from the tip
+                                if tip.reply_tweet_id:
+                                    # Construct URL if we have a reply_tweet_id
+                                    tweet_url = f"https://twitter.com/ZapZapBot/status/{tip.reply_tweet_id}/photo/1"
+                                    logging.info(
+                                        f"Payment failed but GIF was posted. Sending SSE with URL: {tweet_url}"
+                                    )
+
+                                    # Send notification with just the GIF URL
+                                    notify_clients_of_payment_status(
+                                        payment_hash,
+                                        status="gif_ready",
+                                        message="GIF posted but payment failed (no wallet address)",
+                                        tweet_url=tweet_url,
+                                    )
+                        except Exception as e:
+                            logging.error(f"Error in forward_and_notify: {e}")
+
                     # Only spawn forwarding thread if we just marked it as paid
-                    t = threading.Thread(target=forward_payment_to_receiver, args=(tip.id,))
+                    t = threading.Thread(target=forward_and_notify)
                     t.start()
                     logging.info(f"[MyGreenlightListener] Spawned thread to forward tip #{tip.id}")
                 else:
