@@ -15,6 +15,7 @@ class TipCreate(BaseModel):
     comment: Optional[str] = None
     tweet_url: HttpUrl
     tip_sender: Optional[str] = "anonymous"
+    gif_url: Optional[str] = None
 
 
 class TipOut(BaseModel):

@@ -148,6 +148,7 @@ def create_tip(
             comment=tip_data.comment,
             amount_sats=tip_data.amount_sats,
             created_at=datetime.now(timezone.utc),
+            gif_url=tip_data.gif_url,
         )
 
         db.add(new_tip)
