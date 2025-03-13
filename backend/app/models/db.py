@@ -60,6 +60,7 @@ class Tip(Base):
     paid_out: Mapped[bool] = mapped_column(default=False)
     forward_payment_hash: Mapped[Optional[str]] = mapped_column(nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
+    gif_url: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     # Relationships
     sender: Mapped[Optional["User"]] = relationship(
@@ -92,3 +93,11 @@ class Tweet(Base):
         back_populates="authored_tweets",
         foreign_keys=[tweet_author],
     )
+
+
+class ProcessedMention(Base):
+    __tablename__ = "processed_mentions"
+
+    tweet_id: Mapped[str] = mapped_column(primary_key=True)
+    author_id: Mapped[str] = mapped_column(nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc))
