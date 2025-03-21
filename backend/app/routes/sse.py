@@ -80,16 +80,27 @@ async def subscribe_to_payment(request: Request, payment_hash: str):
 
 
 def notify_clients_of_payment_status(
-    payment_hash: str, status: str = "paid", message: Optional[str] = "Payment received successfully"
+    payment_hash: str,
+    status: str = "paid",
+    message: Optional[str] = "Payment received successfully",
+    tweet_url: Optional[str] = None,
 ):
     """Send payment status update to all connected clients"""
     if payment_hash not in connections:
         return
+    
+    payload = {
+        "payment_hash": payment_hash,
+        "status": status,
+        "message": message,
+        "timestamp": datetime.now().isoformat(),
+    }
+
+    if tweet_url:
+        payload["tweet_url"] = tweet_url
 
     # Create the message only once
-    update = json.dumps(
-        {"payment_hash": payment_hash, "status": status, "message": message, "timestamp": datetime.now().isoformat()}
-    )
+    update = json.dumps(payload)
 
     dead_connections = []
     for conn in connections[payment_hash]:

@@ -1,12 +1,16 @@
+import json
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from io import BytesIO
+from typing import Dict, List, Optional
 
+import requests
 import tweepy
 from config import settings
 from fastapi import HTTPException
 from models.db import Tip, User
+from requests_oauthlib import OAuth1
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -52,6 +56,164 @@ write_client = tweepy.Client(
     access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
 )
 
+write_client_for_gif = tweepy.Client(
+    consumer_key=settings.GIFBOT_CONSUMER_KEY,
+    consumer_secret=settings.GIFBOT_CONSUMER_SECRET,
+    access_token=settings.GIFBOT_ACCESS_TOKEN,
+    access_token_secret=settings.GIFBOT_ACCESS_TOKEN_SECRET,
+)
+
+
+def post_gif_to_twitter(db: Session, tip: Tip) -> Optional[str]:
+    """Post a GIF to Twitter using the GIF bot account and return with url /photo/1"""
+    if not tip.tweet or not tip.gif_url:
+        logging.warning(f"Tweet {tip.tweet_id} or GIF URL not found. Skipping GIF post.")
+        return None
+
+    try:
+        # Download the GIF
+        logging.info(f"Attempting to download GIF from {tip.gif_url}")
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        response = requests.get(tip.gif_url, headers=headers, timeout=10)
+
+        if response.status_code != 200:
+            logging.error(f"Failed to download GIF from {tip.gif_url}")
+            return None
+
+        content_type = response.headers.get("Content-Type", "image/gif")
+        media_content = response.content
+        media_size = len(media_content)
+        logging.info(f"Downloaded {media_size} bytes of {content_type}")
+
+        # Create OAuth1 auth object
+        oauth = OAuth1(
+            settings.TWITTER_CONSUMER_KEY,
+            client_secret=settings.TWITTER_CONSUMER_SECRET,
+            resource_owner_key=settings.TWITTER_ACCESS_TOKEN,
+            resource_owner_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
+        )
+
+        # INIT phase
+        init_url = "https://upload.twitter.com/1.1/media/upload.json"
+        init_data = {
+            "command": "INIT",
+            "total_bytes": media_size,
+            "media_type": content_type,
+            "media_category": "tweet_gif",
+        }
+
+        logging.info("INIT phase...")
+        init_response = requests.post(init_url, data=init_data, auth=oauth)
+
+        if init_response.status_code != 202:
+            logging.error(f"INIT failed with status {init_response.status_code}: {init_response.text}")
+            return None
+
+        media_id = init_response.json()["media_id_string"]
+        logging.info(f"Media ID: {media_id}")
+
+        # APPEND phase
+        media_io = BytesIO(media_content)
+        chunk_size = 4 * 1024 * 1024  # 4MB chunks
+
+        segment_index = 0
+        bytes_sent = 0
+
+        while bytes_sent < media_size:
+            chunk = media_io.read(chunk_size)
+            if not chunk:
+                break
+
+            logging.info(f"APPEND phase, segment {segment_index}, size {len(chunk)} bytes...")
+
+            append_url = "https://upload.twitter.com/1.1/media/upload.json"
+            append_data = {"command": "APPEND", "media_id": media_id, "segment_index": segment_index}
+
+            files = {"media": chunk}
+
+            append_response = requests.post(append_url, data=append_data, files=files, auth=oauth)
+
+            if append_response.status_code != 204:
+                logging.error(f"APPEND failed with status {append_response.status_code}: {append_response.text}")
+                return None
+
+            segment_index += 1
+            bytes_sent += len(chunk)
+            logging.info(f"Progress: {bytes_sent}/{media_size} bytes ({bytes_sent / media_size * 100:.1f}%)")
+
+        # FINALIZE phase
+        finalize_url = "https://upload.twitter.com/1.1/media/upload.json"
+        finalize_data = {"command": "FINALIZE", "media_id": media_id}
+
+        logging.info("FINALIZE phase...")
+        finalize_response = requests.post(finalize_url, data=finalize_data, auth=oauth)
+
+        if finalize_response.status_code not in (200, 201):
+            logging.error(f"FINALIZE failed with status {finalize_response.status_code}: {finalize_response.text}")
+            return None
+
+        finalize_json = finalize_response.json()
+        logging.info(f"Upload complete! Response: {json.dumps(finalize_json, indent=2)}")
+
+        # Check processing state
+        if "processing_info" in finalize_json:
+            processing_info = finalize_json["processing_info"]
+            logging.info(f"Media processing state: {processing_info.get('state')}")
+
+        # Create tweet text with sender, recipient, but without the URL
+        sender_username = f"@{tip.sender.twitter_username}" if tip.sender else "Anonymous"
+        recipient_username = f"@{tip.tweet.author.twitter_username}" if tip.tweet and tip.tweet.author else "Unknown"
+
+        # Create the tweet text without the URL to the original tweet
+        tweet_text = f"{sender_username} just sent {recipient_username} {tip.amount_sats} sats"
+
+        # Post a standalone tweet with the media
+        url = "https://api.twitter.com/2/tweets"
+        payload = {
+            "text": tweet_text,
+            "media": {"media_ids": [media_id]},
+        }
+
+        headers = {"Content-Type": "application/json"}
+
+        response = requests.post(url, json=payload, auth=oauth, headers=headers)
+
+        if response.status_code not in (200, 201):
+            logging.error(f"Tweet creation failed with status {response.status_code}: {response.text}")
+            return None
+
+        response_json = response.json()
+        logging.info(f"Tweet created! Response: {json.dumps(response_json, indent=2)}")
+
+        tweet_id = response_json["data"]["id"]
+
+        # Update the tip with the reply tweet ID
+        tip.reply_tweet_id = tweet_id
+        db.commit()
+
+        # Get username for URL construction
+        try:
+            user_info_response = requests.get("https://api.twitter.com/2/users/me", auth=oauth)
+            username = user_info_response.json()["data"]["username"]
+        except:
+            # Fallback to a default
+            username = "ZapZapBot"
+
+        # Generate the tweet URL with /photo/1
+        tweet_url = f"https://twitter.com/{username}/status/{tweet_id}/photo/1"
+        logging.info(f"Posted GIF to Twitter for Tip #{tip.id}. Tweet URL: {tweet_url}")
+
+        return tweet_url
+
+    except Exception as e:
+        logging.error(f"Error posting GIF to Twitter: {str(e)}")
+        import traceback
+
+        traceback.print_exc()
+        return None
+
 
 def add_rate_limit_tracking(response) -> None:
     """Log rate limit information from Twitter API response headers"""
@@ -81,7 +243,7 @@ def update_user_avatars(db: Session, usernames: List[str]) -> None:
     try:
         for i in range(0, len(usernames), 100):
             batch = usernames[i : i + 100]
-            response = read_client.get_users(usernames=batch, user_fields=["profile_image_url"])
+            response = read_client.get_users(usernames=batch, user_fields=["profile_image_url_bigger"])
 
             # Log full response details
             logging.info(f"[{request_id}] Twitter API Response: {response}")

@@ -60,6 +60,7 @@ class Tip(Base):
     paid_out: Mapped[bool] = mapped_column(default=False)
     forward_payment_hash: Mapped[Optional[str]] = mapped_column(nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.now(timezone.utc), index=True)
+    gif_url: Mapped[Optional[str]] = mapped_column(nullable=True)
 
     # Relationships
     sender: Mapped[Optional["User"]] = relationship(
