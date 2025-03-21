@@ -162,10 +162,17 @@ def post_gif_to_twitter(db: Session, tip: Tip) -> Optional[str]:
             processing_info = finalize_json["processing_info"]
             logging.info(f"Media processing state: {processing_info.get('state')}")
 
+        # Create tweet text with sender, recipient, but without the URL
+        sender_username = f"@{tip.sender.twitter_username}" if tip.sender else "Anonymous"
+        recipient_username = f"@{tip.tweet.author.twitter_username}" if tip.tweet and tip.tweet.author else "Unknown"
+
+        # Create the tweet text without the URL to the original tweet
+        tweet_text = f"{sender_username} just sent {recipient_username} {tip.amount_sats} sats"
+
         # Post a standalone tweet with the media
         url = "https://api.twitter.com/2/tweets"
         payload = {
-            "text": "",  # Empty status, just the GIF
+            "text": tweet_text,
             "media": {"media_ids": [media_id]},
         }
 
