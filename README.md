@@ -70,6 +70,14 @@ docker push zapzap-backend:production europe-west1-docker.pkg.dev/zapzap-me/zapz
 gcloud run deploy production --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:production
 ```
 
+### For Windows
+```bash
+docker build -t zapzap-backend:production -f Dockerfile --platform linux/x86_64 .
+docker tag zapzap-backend:production europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:production
+docker push europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:production
+gcloud run deploy production --image europe-west1-docker.pkg.dev/zapzap-me/zapzap-repo/zapzap-backend:production
+```
+
 ## Database Schema Changes
 
 ```bash
