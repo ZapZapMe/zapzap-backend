@@ -56,12 +56,6 @@ write_client = tweepy.Client(
     access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
 )
 
-write_client_for_gif = tweepy.Client(
-    consumer_key=settings.GIFBOT_CONSUMER_KEY,
-    consumer_secret=settings.GIFBOT_CONSUMER_SECRET,
-    access_token=settings.GIFBOT_ACCESS_TOKEN,
-    access_token_secret=settings.GIFBOT_ACCESS_TOKEN_SECRET,
-)
 
 
 def post_gif_to_twitter(db: Session, tip: Tip) -> Optional[str]:

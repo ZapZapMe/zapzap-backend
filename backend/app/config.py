@@ -14,12 +14,6 @@ class Settings(BaseSettings):
     # Tenor api key
     TENOR_API_KEY: str
 
-    # Twitter settings for GiftBot
-    GIFBOT_CONSUMER_KEY: str
-    GIFBOT_CONSUMER_SECRET: str
-    GIFBOT_ACCESS_TOKEN: str
-    GIFBOT_ACCESS_TOKEN_SECRET: str
-
     # Required settings (no default value)
     TWITTER_CONSUMER_KEY: str
     TWITTER_CONSUMER_SECRET: str
