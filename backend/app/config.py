@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     GREENLIGHT_CLIENT_PRIVATE_KEY: str
 
     # Application settings
-    LEADERBOARD_CALCULATION_WINDOW_DAYS: int = 30  # a value in .env would override this
+    LEADERBOARD_CALCULATION_WINDOW_DAYS: int = 365  # a value in .env would override this
     TWITTER_AVATAR_CACHE_TTL_DAYS: int = 30
     BREEZ_LOGLEVEL: str = "INFO"
     FRONTEND_URL: str
